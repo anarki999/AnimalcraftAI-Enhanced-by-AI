@@ -1,223 +1,99 @@
-//Microsoft Developer Studio generated resource script.
-//
-#include "resrc1.h"
-
-#define APSTUDIO_READONLY_SYMBOLS
-/////////////////////////////////////////////////////////////////////////////
-//
-// Generated from the TEXTINCLUDE 2 resource.
-//
-#define APSTUDIO_HIDDEN_SYMBOLS
-#include "windows.h"
-#undef APSTUDIO_HIDDEN_SYMBOLS
+#include <windows.h>
 #include "resource.h"
 
-/////////////////////////////////////////////////////////////////////////////
-#undef APSTUDIO_READONLY_SYMBOLS
+LANGUAGE 0x00, 0x00
 
-/////////////////////////////////////////////////////////////////////////////
-// Chinese (÷–π˙) resources
+300 WAVE "WAVE300_1.wav"
+301 WAVE "WAVE301_1.wav"
+302 WAVE "WAVE302_1.wav"
+303 WAVE "WAVE303_1.wav"
+304 WAVE "WAVE304_1.wav"
+305 WAVE "WAVE305_1.wav"
+306 WAVE "WAVE306_1.wav"
+307 WAVE "WAVE307_1.wav"
+308 WAVE "WAVE308_1.wav"
 
-#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
-#ifdef _WIN32
-LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
-#pragma code_page(936)
-#endif //_WIN32
+201 BITMAP "BITMAP201_1.bmp"
+202 BITMAP "BITMAP202_1.bmp"
+203 BITMAP "BITMAP203_1.bmp"
+204 BITMAP "BITMAP204_1.bmp"
+208 BITMAP "BITMAP208_1.bmp"
+209 BITMAP "BITMAP209_1.bmp"
+210 BITMAP "BITMAP210_1.bmp"
+211 BITMAP "BITMAP211_1.bmp"
+212 BITMAP "BITMAP212_1.bmp"
+213 BITMAP "BITMAP213_1.bmp"
+214 BITMAP "BITMAP214_1.bmp"
+215 BITMAP "BITMAP215_1.bmp"
+216 BITMAP "BITMAP216_1.bmp"
+217 BITMAP "BITMAP217_1.bmp"
+218 BITMAP "BITMAP218_1.bmp"
+219 BITMAP "BITMAP219_1.bmp"
+220 BITMAP "BITMAP220_1.bmp"
+221 BITMAP "BITMAP221_1.bmp"
+222 BITMAP "BITMAP222_1.bmp"
+223 BITMAP "BITMAP223_1.bmp"
 
-/////////////////////////////////////////////////////////////////////////////
-//
-// Icon
-//
+400 MENU
+LANGUAGE 0x04, 0x02
+{
+  POPUP "Êñá‰ª∂(&F)"
+  {
+    MENUITEM "Êñ∞Â±ÄÈù¢(&R)",  401
+    MENUITEM "ÁîµËÑëËµ∞Ê£ã(&B)",  402
+    MENUITEM "ÂçïÊú∫ÁªÉ‰π†(&T)",  403
+    MENUITEM SEPARATOR
+    MENUITEM "Ê†áÂáÜ(&S)",  404
+    MENUITEM "ËÆ©ËôéÊîªÈò≤(&H)",  405
+    MENUITEM "‰ªéÂâ™Ë¥¥ÊùøËæìÂÖ•FEN(&I)",  406
+    MENUITEM "ËæìÂá∫FENËá≥Ââ™Ë¥¥Êùø(&O)",  409
+    MENUITEM SEPARATOR
+    MENUITEM "ÊÇîÊ£ã(&U)",  407
+    MENUITEM "Ëôö‰∏ÄÊâã(&P)",  411
+    MENUITEM SEPARATOR
+    MENUITEM "ÁøªËΩ¨Ê£ãÁõò(&F)",  412
+    MENUITEM "ÂêéÂè∞ÊÄùËÄÉ(&G)",  413
+    MENUITEM "ÊòæÁ§∫ÂêéÂè∞ÂàÜÊûêËßÜÁ™ó(&V)",  414
+    MENUITEM SEPARATOR
+    MENUITEM "ÈÄÄÂá∫(&X)",  408
+  }
+}
 
-// Icon with lowest ID value placed first to ensure application icon
-// remains consistent on all systems.
-IDI_APPICON             ICON    DISCARDABLE     "RES\\Games.ico"
+100 ICON "ICON100_1.ico"
 
-/////////////////////////////////////////////////////////////////////////////
-//
-// Bitmap
-//
+IDD_PONDER_DIALOG DIALOG 0, 0, 260, 100
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "ÂêéÂè∞ÂàÜÊûê"
+FONT 9, "MS Shell Dlg"
+{
+  EDITTEXT IDC_PONDER_EDIT, 10, 10, 240, 80, ES_MULTILINE | ES_READONLY | WS_VSCROLL
+}
 
-IDB_BOARD               BITMAP  DISCARDABLE     "RES\\background.BMP"
-IDB_TRAP                BITMAP  DISCARDABLE     "RES\\trap.BMP"
-IDB_DEN                 BITMAP  DISCARDABLE     "RES\\den.BMP"
-IDB_SELECTED            BITMAP  DISCARDABLE     "RES\\SELECTED.BMP"
-IDB_RE                  BITMAP  DISCARDABLE     "RES\\elephant.BMP"
-IDB_RL                  BITMAP  DISCARDABLE     "RES\\lion.BMP"
-IDB_RT                  BITMAP  DISCARDABLE     "RES\\tiger.BMP"
-IDB_RP                  BITMAP  DISCARDABLE     "RES\\leopard.BMP"
-IDB_RW                  BITMAP  DISCARDABLE     "RES\\wolf.BMP"
-IDB_RD                  BITMAP  DISCARDABLE     "RES\\dog.BMP"
-IDB_RC                  BITMAP  DISCARDABLE     "RES\\cat.BMP"
-IDB_RM                  BITMAP  DISCARDABLE     "RES\\mouse.BMP"
-IDB_BE                  BITMAP  DISCARDABLE     "RES\\elephant - ∏±±æ.BMP"
-IDB_BL                  BITMAP  DISCARDABLE     "RES\\lion - ∏±±æ.BMP"
-IDB_BT                  BITMAP  DISCARDABLE     "RES\\tiger - ∏±±æ.BMP"
-IDB_BP                  BITMAP  DISCARDABLE     "RES\\leopard - ∏±±æ.BMP"
-IDB_BW                  BITMAP  DISCARDABLE     "RES\\wolf - ∏±±æ.BMP"
-IDB_BD                  BITMAP  DISCARDABLE     "RES\\dog - ∏±±æ.BMP"
-IDB_BC                  BITMAP  DISCARDABLE     "RES\\cat - ∏±±æ.BMP"
-IDB_BM                  BITMAP  DISCARDABLE     "RES\\mouse - ∏±±æ.BMP"
+1 VERSIONINFO
+FILEVERSION 0,0,0,0
+PRODUCTVERSION 0,0,0,0
+FILEOS 0x4
+FILETYPE 0x1
+{
+BLOCK "StringFileInfo"
+{
+BLOCK "040904b0"
+{
+VALUE "Comments", "AI program for Animalcraft"
+VALUE "CompanyName", "Chen Luhan Company"
+VALUE "FileDescription", "AI program for Animalcraft"
+VALUE "FileVersion", "1.7"
+VALUE "InternalName", "AnimalcraftAI"
+VALUE "LegalCopyright", "(C) 2020-2023 Chen Luhan Company"
+VALUE "LegalTrademarks", "AnimalcraftAI"
+VALUE "OriginalFilename", "AnimalcraftAI.EXE"
+VALUE "ProductName", "AnimalcraftAI"
+VALUE "ProductVersion", "1.7"
+}
+}
 
-/////////////////////////////////////////////////////////////////////////////
-//
-// WAVE
-//
-
-IDR_START               WAVE    DISCARDABLE     "RES\\start.wav"
-IDR_MOUSE               WAVE    DISCARDABLE     "RES\\MOUSE.wav"
-IDR_CAT                 WAVE    DISCARDABLE     "RES\\CAT.wav"
-IDR_DOG                 WAVE    DISCARDABLE     "RES\\DOG.wav"
-IDR_WOLF                WAVE    DISCARDABLE     "RES\\WOLF.wav"
-IDR_LEOPARD             WAVE    DISCARDABLE     "RES\\LEOPARD.wav"
-IDR_TIGER               WAVE    DISCARDABLE     "RES\\TIGER.wav"
-IDR_LION                WAVE    DISCARDABLE     "RES\\LION.wav"
-IDR_ELEPHANT            WAVE    DISCARDABLE     "RES\\ELEPHANT.wav"
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// Menu
-//
-
-IDM_MAINMENU MENU DISCARDABLE 
-BEGIN
-    POPUP "Œƒº˛(&F)"
-    BEGIN
-        MENUITEM "Œ“œ»◊ﬂ(&R)",                  IDM_FILE_RED
-        MENUITEM "µÁƒ‘œ»◊ﬂ(&B)",                IDM_FILE_BLACK
-        MENUITEM "µ•ª˙¡∑œ∞(&T)",                IDM_FILE_TRAINING
-        MENUITEM SEPARATOR
-        MENUITEM "±Í◊º(&S)",                    IDM_STANDARD
-        MENUITEM "»√ª¢π•∑¿(&H)",                IDM_HANDICAP
-        MENUITEM "¥”ºÙÃ˘∞Â ‰»ÎFEN(&I)",         IDM_LOADFEN
-        MENUITEM " ‰≥ˆFEN÷¡ºÙÃ˘∞Â(&O)",         IDM_OUTPUTFEN
-        MENUITEM SEPARATOR
-        MENUITEM "ª⁄∆Â(&U)",                    IDM_UNDO
-        MENUITEM SEPARATOR
-        MENUITEM "µÁƒ‘∑÷Œˆ(&A)",                IDD_ANALYZE_DIALOG
-        MENUITEM SEPARATOR
-        MENUITEM "ÕÀ≥ˆ(&X)",                    IDM_FILE_EXIT
-    END
-END
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// Dialog
-//
-
-IDD_ANALYZE_DIALOG DIALOG DISCARDABLE  0, 0, 340, 47
-STYLE WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "∑÷Œˆ¥∞ø⁄"
-FONT 9, "ÀŒÃÂ"
-BEGIN
-    LTEXT           "",IDC_EDIT1,3,4,334,36
-END
-
-
-#ifndef _MAC
-/////////////////////////////////////////////////////////////////////////////
-//
-// Version
-//
-
-VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,0,0,0
- PRODUCTVERSION 0,0,0,0
- FILEFLAGSMASK 0x3fL
-#ifdef _DEBUG
- FILEFLAGS 0x1L
-#else
- FILEFLAGS 0x0L
-#endif
- FILEOS 0x4L
- FILETYPE 0x1L
- FILESUBTYPE 0x0L
-BEGIN
-    BLOCK "StringFileInfo"
-    BEGIN
-        BLOCK "040904b0"
-        BEGIN
-            VALUE "Comments", "AI program for Animalcraft\0"
-            VALUE "CompanyName", "Chen Luhan Company\0"
-            VALUE "FileDescription", "AI program for Animalcraft\0"
-            VALUE "FileVersion", "1.7\0"
-            VALUE "InternalName", "AnimalcraftAI\0"
-            VALUE "LegalCopyright", "(C) 2020-2023 Chen Luhan Company\0"
-            VALUE "LegalTrademarks", "AnimalcraftAI\0"
-            VALUE "OriginalFilename", "AnimalcraftAI.EXE\0"
-            VALUE "PrivateBuild", "\0"
-            VALUE "ProductName", "AnimalcraftAI\0"
-            VALUE "ProductVersion", "1.7\0"
-            VALUE "SpecialBuild", "\0"
-        END
-    END
-    BLOCK "VarFileInfo"
-    BEGIN
-        VALUE "Translation", 0x409, 1200
-    END
-END
-
-#endif    // !_MAC
-
-
-#ifdef APSTUDIO_INVOKED
-/////////////////////////////////////////////////////////////////////////////
-//
-// TEXTINCLUDE
-//
-
-1 TEXTINCLUDE DISCARDABLE 
-BEGIN
-    "resrc1.h\0"
-END
-
-2 TEXTINCLUDE DISCARDABLE 
-BEGIN
-    "#define APSTUDIO_HIDDEN_SYMBOLS\r\n"
-    "#include ""windows.h""\r\n"
-    "#undef APSTUDIO_HIDDEN_SYMBOLS\r\n"
-    "#include ""resource.h""\r\n"
-    "\0"
-END
-
-3 TEXTINCLUDE DISCARDABLE 
-BEGIN
-    "\r\n"
-    "\0"
-END
-
-#endif    // APSTUDIO_INVOKED
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// DESIGNINFO
-//
-
-#ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO DISCARDABLE 
-BEGIN
-    IDD_ANALYZE_DIALOG, DIALOG
-    BEGIN
-        RIGHTMARGIN, 208
-        BOTTOMMARGIN, 46
-    END
-END
-#endif    // APSTUDIO_INVOKED
-
-#endif    // Chinese (÷–π˙) resources
-/////////////////////////////////////////////////////////////////////////////
-
-
-
-#ifndef APSTUDIO_INVOKED
-/////////////////////////////////////////////////////////////////////////////
-//
-// Generated from the TEXTINCLUDE 3 resource.
-//
-
-
-/////////////////////////////////////////////////////////////////////////////
-#endif    // not APSTUDIO_INVOKED
-
+BLOCK "VarFileInfo"
+{
+VALUE "Translation", 0x0409 0x04B0  
+}
+}
