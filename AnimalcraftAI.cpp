@@ -2,12 +2,12 @@
 #include <time.h>
 #include <windows.h>
 #include <stdio.h>
+#include <string.h>
 #include "ucci.h"
 #include "resource.h"
 
 #pragma comment(lib, "winmm.lib")
 
-// 窗口和绘图属性
 const int WINDOW_STYLES = WS_OVERLAPPED | WS_SYSMENU | WS_CAPTION | WS_MINIMIZEBOX;
 const int MASK_COLOR = RGB(0, 255, 0);
 const int SQUARE_SIZE = 80;
@@ -15,13 +15,11 @@ const int BOARD_EDGE = 8;
 const int BOARD_WIDTH = BOARD_EDGE + SQUARE_SIZE * 9 + BOARD_EDGE;
 const int BOARD_HEIGHT = BOARD_EDGE + SQUARE_SIZE * 7 + BOARD_EDGE;
 
-const char name[24][5]={"　","穴","阱","■","阱","穴","　","　","象","狮","虎","豹","狼","狗","猫","鼠","象","狮","虎","豹","狼","狗","猫","鼠"};//棋子名称
-//常量 
-const int RANK_TOP = 3;//起始行
-const int RANK_BOTTOM = 9;//终点行
-const int FILE_LEFT = 3;//起始列
-const int FILE_RIGHT = 11;//终点列 
-//以下为棋子编号，0-6对应7种棋子
+const char name[24][5]={"\xa1\xa1","\xd1\xa8","\xda\xe5","\xa1\xf6","\xda\xe5","\xd1\xa8","\xa1\xa1","\xa1\xa1","\xcf\xf3","\xca\xa8","\xbb\xa2","\xb1\xaa","\xc0\xc7","\xb9\xb7","\xc3\xa8","\xca\xf3","\xcf\xf3","\xca\xa8","\xbb\xa2","\xb1\xaa","\xc0\xc7","\xb9\xb7","\xc3\xa8","\xca\xf3"};
+const int RANK_TOP = 3;
+const int RANK_BOTTOM = 9;
+const int FILE_LEFT = 3;
+const int FILE_RIGHT = 11;
 const int PIECE_ELEPHANT = 0;
 const int PIECE_LION = 1;
 const int PIECE_TIGER = 2;
@@ -30,14 +28,13 @@ const int PIECE_WOLF = 4;
 const int PIECE_DOG = 5;
 const int PIECE_CAT = 6;
 const int PIECE_MOUSE = 7;
-//其它 
-const int MAX_GEN_MOVES = 35; // 最大的生成走法数
-const int MAX_MOVES = 1000;     // 最大的历史走法数
+const int MAX_GEN_MOVES = 128;
+const int MAX_MOVES = 1000;
 
-int t2=2000,depth=99999999,t,t3;//时间控制和深度控制
+int t2=2000,depth=99999999,t,t3;
 bool fenxi=0,player[2],turn,ranghu=0;
+bool training=0;
 
-// 判断棋子是否在棋盘中的数组
 static const char ccInBoard[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -57,7 +54,6 @@ static const char ccInBoard[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-// 判断棋子是否在九宫的数组
 static const char ccInFort[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -96,12 +92,9 @@ static const bool ccCanJump[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-// 步长
 static const char ccDelta[4] = {-16, -1, 1, 16};
-// 跳河步长
 static const char ccJumpDelta[4] = {-48,-4,4,48};
 
-// 棋盘初始设置
 static int cucpcStartup[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -120,113 +113,44 @@ static int cucpcStartup[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-// 判断棋子是否在棋盘中
-inline bool IN_BOARD(int sq) {
-  return ccInBoard[sq] != 0;
-}
 
-// 获得格子的横坐标
-inline int RANK_Y(int sq) {
-  return sq >> 4;
-}
-
-// 获得格子的纵坐标
-inline int FILE_X(int sq) {
-  return sq & 15;
-}
-
-// 根据纵坐标和横坐标获得格子
-inline int COORD_XY(int x, int y) {
-  return x + (y << 4);
-}
-
-//
-inline int PIECE_NAME(int pc) {
-  return (pc&7);
-}
-
-
-// 翻转格子
-inline int SQUARE_FLIP(int sq) {
-  return 254 - sq;
-}
-
-// 纵坐标水平镜像
-inline int FILE_FLIP(int x) {
-  return 14 - x;
-}
-
-// 横坐标垂直镜像
-inline int RANK_FLIP(int y) {
-  return 15 - y;
-}
-
-// 是否在河中
-inline bool INRIVER(int sq) {
-  return ccInFort[sq]==3;
-}
-// 是否在兽穴中 
-inline bool INSHOUXUE(int sq,int tag) {
-  if(tag==8) return ccInFort[sq]==1;
-  return ccInFort[sq]==5;
-}
-// 是否在陷阱中 
-inline bool INXIANJING(int sq,int tag) {
-  if(tag==8) return ccInFort[sq]==2;
-  return ccInFort[sq]==4;
-}
-
-// 获得红黑标记(红子是8，黑子是16)
-inline int SIDE_TAG(int sd) {
-  return 8 + (sd << 3);
-}
-
-// 获得对方红黑标记
-inline int OPP_SIDE_TAG(int sd) {
-  return 16 - (sd << 3);
-}
-
-// 获得走法的起点
-inline int SRC(int mv) {
-  return mv & 255;
-}
-
-// 获得走法的终点
-inline int DST(int mv) {
-  return mv >> 8;
-}
-
-// 根据起点和终点获得走法
-inline int MOVE(int sqSrc, int sqDst) {
-  return sqSrc + sqDst * 256;
-}
-
-// 走法水平镜像
+inline bool IN_BOARD(int sq) { return ccInBoard[sq] != 0; }
+inline int RANK_Y(int sq) { return sq >> 4; }
+inline int FILE_X(int sq) { return sq & 15; }
+inline int COORD_XY(int x, int y) { return x + (y << 4); }
+inline int PIECE_NAME(int pc) { return (pc&7); }
+inline int SQUARE_FLIP(int sq) { return 254 - sq; }
+inline int FILE_FLIP(int x) { return 14 - x; }
+inline int RANK_FLIP(int y) { return 15 - y; }
+inline bool INRIVER(int sq) { return ccInFort[sq]==3; }
+inline bool INSHOUXUE(int sq,int tag) { if(tag==8) return ccInFort[sq]==1; return ccInFort[sq]==5; }
+inline bool INXIANJING(int sq,int tag) { if(tag==8) return ccInFort[sq]==2; return ccInFort[sq]==4; }
+inline int SIDE_TAG(int sd) { return 8 + (sd << 3); }
+inline int OPP_SIDE_TAG(int sd) { return 16 - (sd << 3); }
+inline int SRC(int mv) { return mv & 255; }
+inline int DST(int mv) { return mv >> 8; }
+inline int MOVE(int sqSrc, int sqDst) { return sqSrc + sqDst * 256; }
 inline int BLACK(int sq) {
-	int x=FILE_X(sq),y=RANK_Y(sq);
-	return COORD_XY(14-x,y);
-  } 
+int x=FILE_X(sq),y=RANK_Y(sq);
+return COORD_XY(14-x,y);
+}
 
-// 历史走法信息(占4字节)
 struct MoveStruct {
   int wmv,ucpcCaptured,wpc;
   int dwKey;
-
   void Set(int mv, int pcCaptured,int pc, int dwKey_) {
     wmv = mv;
     ucpcCaptured = pcCaptured;
     wpc=pc;
     dwKey = dwKey_;
   }
-}; // mvs
+};
 
-// RC4密码流生成器
 struct RC4Struct {
   int s[256];
   int x, y;
-
-  void InitZero(void);   // 用空密钥初始化密码流生成器
-  int Nextint(void) {  // 生成密码流的下一个字节
+  void InitZero(void);
+  int Nextint(void) {
     int uc;
     x = (x + 1) & 255;
     y = (y + s[x]) & 255;
@@ -235,7 +159,7 @@ struct RC4Struct {
     s[y] = uc;
     return s[(s[x] + s[y]) & 255];
   }
-  int NextLong(void) { // 生成密码流的下四个字节
+  int NextLong(void) {
     int uc0, uc1, uc2, uc3;
     uc0 = Nextint();
     uc1 = Nextint();
@@ -245,15 +169,11 @@ struct RC4Struct {
   }
 };
 
-// 用空密钥初始化密码流生成器
 void RC4Struct::InitZero(void) {
   int i, j;
   int uc;
-
   x = y = j = 0;
-  for (i = 0; i < 256; i ++) {
-    s[i] = i;
-  }
+  for (i = 0; i < 256; i ++) { s[i] = i; }
   for (i = 0; i < 256; i ++) {
     j = (j + s[i]) & 255;
     uc = s[i];
@@ -262,19 +182,15 @@ void RC4Struct::InitZero(void) {
   }
 }
 
-// Zobrist结构
 struct ZobristStruct {
   int dwKey, dwLock0, dwLock1;
-
-  void InitZero(void) {                 // 用零填充Zobrist
-    dwKey = dwLock0 = dwLock1 = 0;
-  }
-  void InitRC4(RC4Struct &rc4) {        // 用密码流填充Zobrist
+  void InitZero(void) { dwKey = dwLock0 = dwLock1 = 0; }
+  void InitRC4(RC4Struct &rc4) {
     dwKey = rc4.NextLong();
     dwLock0 = rc4.NextLong();
     dwLock1 = rc4.NextLong();
   }
-  void Xor(const ZobristStruct &zobr) { // 执行XOR操作
+  void Xor(const ZobristStruct &zobr) {
     dwKey ^= zobr.dwKey;
     dwLock0 ^= zobr.dwLock0;
     dwLock1 ^= zobr.dwLock1;
@@ -286,17 +202,14 @@ struct ZobristStruct {
   }
 };
 
-// Zobrist表
 static struct {
   ZobristStruct Player;
   ZobristStruct Table[16][256];
 } Zobrist;
 
-// 初始化Zobrist表
 static void InitZobrist(void) {
   int i, j;
   RC4Struct rc4;
-
   rc4.InitZero();
   Zobrist.Player.InitRC4(rc4);
   for (i = 0; i < 16; i ++) {
@@ -305,120 +218,110 @@ static void InitZobrist(void) {
     }
   }
 }
-// 局面结构
+
 struct PositionStruct {
-  bool sdPlayer;                   // 轮到谁走，0=红方，1=黑方
-  int ucpcSquares[256];            // 棋盘上的棋子
-  int nDistance, nMoveNum, nMoveNum2;         // 距离根节点的步数，历史走法数
-  MoveStruct mvsList[MAX_MOVES];   // 历史走法信息列表
-  ZobristStruct zobr;              // Zobrist
+  bool sdPlayer;
+  int ucpcSquares[256];
+  int nDistance, nMoveNum, nMoveNum2;
+  MoveStruct mvsList[MAX_MOVES];
+  ZobristStruct zobr;
   bool CanJump(int src,int dst)
   {
-  	  if(PIECE_NAME(ucpcSquares[src])==PIECE_LION||PIECE_NAME(ucpcSquares[src])==PIECE_TIGER)
-  	  {
-  	  	if(!ccCanJump[src]||!ccCanJump[dst]) return 0;
-  	  	  for(int i=0;i<=3;i++)
-  	  	  {
-  	  	  	  if(dst-src==ccJumpDelta[i])
-  	  	  	  {
-		  	  	  	  	for(int j=src+ccDelta[i];j!=dst&&IN_BOARD(j);j+=ccDelta[i])
-		  	  	  	  	{
-  	  	  	  		        if(ucpcSquares[j]==PIECE_MOUSE+24-(ucpcSquares[src]-PIECE_NAME(ucpcSquares[src]))||!INRIVER(j)) return 0;
-						}
-						return 1;
-				}
-		  }
-		  return 0;
-	  }
-  	  return 0;
+    if(PIECE_NAME(ucpcSquares[src])==PIECE_LION||PIECE_NAME(ucpcSquares[src])==PIECE_TIGER)
+    {
+    if(!ccCanJump[src]||!ccCanJump[dst]) return 0;
+      for(int i=0;i<=3;i++)
+      {
+        if(dst-src==ccJumpDelta[i])
+        {
+        for(int j=src+ccDelta[i];j!=dst&&IN_BOARD(j);j+=ccDelta[i])
+        {
+                if(ucpcSquares[j]==PIECE_MOUSE+24-(ucpcSquares[src]-PIECE_NAME(ucpcSquares[src]))||!INRIVER(j)) return 0;
+}
+return 1;
+}
+  }
+  return 0;
+  }
+    return 0;
   }
   bool CanMove(int src,int dst)
   {
-  	  if(PIECE_NAME(ucpcSquares[src])==PIECE_MOUSE)
-  	  {
-  	  	  for(int i=0;i<=3;i++)
-  	  	  {
-  	  	  	  if(dst-src==ccDelta[i])
-  	  	  	  {
-					return 1;
-				}
-		  }
-		  return 0;
-		}
-  	  	if(INRIVER(dst)) return 0;
-  	  	  for(int i=0;i<=3;i++)
-  	  	  {
-  	  	  	  if(dst-src==ccDelta[i])
-  	  	  	  {
-					return 1;
-				}
-		  }
-		  return 0;
+    if(PIECE_NAME(ucpcSquares[src])==PIECE_MOUSE)
+    {
+      for(int i=0;i<=3;i++)
+      {
+        if(dst-src==ccDelta[i])
+        {
+return 1;
+}
+  }
+  return 0;
+}
+    if(INRIVER(dst)) return 0;
+      for(int i=0;i<=3;i++)
+      {
+        if(dst-src==ccDelta[i])
+        {
+return 1;
+}
+  }
+  return 0;
   }
   bool CanEat(int src,int dst)
   {
-  	if(ucpcSquares[dst]==0) return 0;
-	  if(ucpcSquares[src]==0||ucpcSquares[dst]==0) return 0;
-  	int as=PIECE_NAME(ucpcSquares[src]),bs=PIECE_NAME(ucpcSquares[dst]);
-  	if(INXIANJING(dst,ucpcSquares[dst]-bs)) return 1;
-  	  if(as==PIECE_MOUSE&&bs==PIECE_ELEPHANT)
-  	  {
-  	  	  if(INRIVER(src)&&!INRIVER(dst)) return 0;
-  	  	  return 1;
-	}
-  	  if(as==PIECE_ELEPHANT&&bs==PIECE_MOUSE) return 0;
-  	  return as<=bs;
+  if(ucpcSquares[dst]==0) return 0;
+  if(ucpcSquares[src]==0||ucpcSquares[dst]==0) return 0;
+  int as=PIECE_NAME(ucpcSquares[src]),bs=PIECE_NAME(ucpcSquares[dst]);
+  if(INXIANJING(dst,ucpcSquares[dst]-bs)) return 1;
+    if(as==PIECE_MOUSE&&bs==PIECE_ELEPHANT)
+    {
+      if(INRIVER(src)&&!INRIVER(dst)) return 0;
+      return 1;
+}
+    if(as==PIECE_ELEPHANT&&bs==PIECE_MOUSE) return 0;
+    return as<=bs;
   }
-  void ClearBoard(void) {         // 清空棋盘
+  void ClearBoard(void) {
     sdPlayer=FALSE;
-	nDistance = 0;
+    nDistance = 0;
     memset(ucpcSquares, 0, sizeof(ucpcSquares));
     zobr.InitZero();
   }
-  void SetIrrev(void) {           // 清空(初始化)历史走法信息
+  void SetIrrev(void) {
     mvsList[0].Set(0, 0,0, zobr.dwKey);
     nMoveNum = 1;
   }
-  void SetIrrev2(void) {           // 清空(初始化)历史走法信息
+  void SetIrrev2(void) {
     nMoveNum2 = 1;
   }
-  void Startup(void);             // 初始化棋盘
-  void ChangeSide(void) {         // 交换走子方
+  void Startup(void);
+  void ChangeSide(void) {
     sdPlayer = !sdPlayer;
     zobr.Xor(Zobrist.Player);
   }
-  void AddPiece(int sq, int pc) { // 在棋盘上放一枚棋子
+  void AddPiece(int sq, int pc) {
     ucpcSquares[sq] = pc;
-    // 红方加分，黑方(注意"cucvlPiecePos"取值要颠倒)减分
-    if (pc < 16) {
-      zobr.Xor(Zobrist.Table[pc - 8][sq]);
-    } else {
-      zobr.Xor(Zobrist.Table[pc - 8][sq]);
-    }
+    if (pc < 16) { zobr.Xor(Zobrist.Table[pc - 8][sq]); }
+    else { zobr.Xor(Zobrist.Table[pc - 8][sq]); }
   }
-  void DelPiece(int sq, int pc) { // 从棋盘上拿走一枚棋子
+  void DelPiece(int sq, int pc) {
     ucpcSquares[sq] = 0;
-    // 红方减分，黑方(注意"cucvlPiecePos"取值要颠倒)加分
-    if (pc < 16) {
-      zobr.Xor(Zobrist.Table[pc - 8][sq]);
-    } else {
-      zobr.Xor(Zobrist.Table[pc - 8][sq]);
-    }
+    if (pc < 16) { zobr.Xor(Zobrist.Table[pc - 8][sq]); }
+    else { zobr.Xor(Zobrist.Table[pc - 8][sq]); }
   }
-  bool Captured(void) const {     // 上一步是否吃子
-    return mvsList[nMoveNum - 1].ucpcCaptured != 0;
-  }
-  int MovePiece(int mv);                      // 搬一步棋的棋子
-  void UndoMovePiece(int mv, int pcCaptured); // 撤消搬一步棋的棋子
-  bool MakeMove(int mv);                      // 走一步棋
-  void UndoMakeMove(void) {                   // 撤消走一步棋
+  bool Captured(void) const { return mvsList[nMoveNum - 1].ucpcCaptured != 0; }
+  int MovePiece(int mv);
+  void UndoMovePiece(int mv, int pcCaptured);
+  bool MakeMove(int mv);
+  void UndoMakeMove(void) {
     nDistance --;
     nMoveNum --;
     nMoveNum2 --;
     ChangeSide();
     UndoMovePiece(mvsList[nMoveNum].wmv, mvsList[nMoveNum].ucpcCaptured);
   }
-  void NullMove(void) {                       // 走一步空步 
+  void NullMove(void) {
     int dwKey;
     dwKey = zobr.dwKey;
     ChangeSide();
@@ -427,55 +330,47 @@ struct PositionStruct {
     nMoveNum2 ++;
     nDistance ++;
   }
-  void UndoNullMove(void) {                   // 撤消走一步空步
+  void UndoNullMove(void) {
     nDistance --;
     nMoveNum --;
     nMoveNum2 --;
     ChangeSide();
   }
-  // 生成所有走法，如果"bCapture"为"1"则只生成吃子走法
   int GenerateMoves(int *mvs, bool bCapture = 0);
-  bool LegalMove(int mv);               // 判断走法是否合理
+  bool LegalMove(int mv);
   bool IsMate(void);
   bool RepWuLai(void);
   bool RepWuSong(void);
   bool RepStatus(void);
-  void Mirror(PositionStruct &posMirror) const; // 对局面镜像
+  void Mirror(PositionStruct &posMirror) const;
 };
 
-// 初始化棋盘
 void PositionStruct::Startup(void) {
   int sq, pc;
   ClearBoard();
   for (sq = 0; sq < 256; sq ++) {
-  	if(IN_BOARD(sq))
-  	{
-	    pc = cucpcStartup[sq];
-	    if (pc != 0) {
-	      AddPiece(sq, pc);
-	    }
-	}
+  if(IN_BOARD(sq))
+  {
+    pc = cucpcStartup[sq];
+    if (pc != 0) { AddPiece(sq, pc); }
+}
   }
   SetIrrev();
   SetIrrev2();
 }
 
-// 搬一步棋的棋子
 int PositionStruct::MovePiece(int mv) {
   int sqSrc, sqDst, pc, pcCaptured;
   sqSrc = SRC(mv);
   sqDst = DST(mv);
   pcCaptured = ucpcSquares[sqDst];
-  if (pcCaptured != 0) {
-    DelPiece(sqDst, pcCaptured);
-  }
+  if (pcCaptured != 0) { DelPiece(sqDst, pcCaptured); }
   pc = ucpcSquares[sqSrc];
   DelPiece(sqSrc, pc);
   AddPiece(sqDst, pc);
   return pcCaptured;
 }
 
-// 撤消搬一步棋的棋子
 void PositionStruct::UndoMovePiece(int mv, int pcCaptured) {
   int sqSrc, sqDst, pc;
   sqSrc = SRC(mv);
@@ -483,18 +378,13 @@ void PositionStruct::UndoMovePiece(int mv, int pcCaptured) {
   pc = ucpcSquares[sqDst];
   DelPiece(sqDst, pc);
   AddPiece(sqSrc, pc);
-  if (pcCaptured != 0) {
-    AddPiece(sqDst, pcCaptured);
-  }
+  if (pcCaptured != 0) { AddPiece(sqDst, pcCaptured); }
 }
 
-// 走一步棋
 bool PositionStruct::MakeMove(int mv) {
   int pcCaptured;
   int dwKey;
-
   dwKey = zobr.dwKey;
-
   pcCaptured = MovePiece(mv);
   ChangeSide();
   mvsList[nMoveNum].Set(mv, pcCaptured,ucpcSquares[DST(mv)], dwKey);
@@ -503,396 +393,368 @@ bool PositionStruct::MakeMove(int mv) {
   nDistance ++;
   return 1;
 }
-// "GenerateMoves"参数
+
 const bool GEN_CAPTURE = 1;
 
-// 生成所有走法，如果"bCapture"为"1"则只生成吃子走法
 int PositionStruct::GenerateMoves(int *mvs, bool bCapture)
 {
   int  nGenMoves,  sqSrc, sqDst;
   int pcSelfSide, pcOppSide, pcSrc, pcDst;
-  // 生成所有走法，需要经过以下几个步骤：
-
   nGenMoves = 0;
   pcSelfSide = SIDE_TAG(sdPlayer);
   pcOppSide = OPP_SIDE_TAG(sdPlayer);
   for (sqSrc = 0; sqSrc < 256; sqSrc ++) {
-  	if(!IN_BOARD(sqSrc)) continue;
-    // 1. 找到一个本方棋子，再做以下判断：
+  if(!IN_BOARD(sqSrc)) continue;
     pcSrc = ucpcSquares[sqSrc];
-    if ((pcSrc & pcSelfSide) == 0) {
-      continue;
-    }
-	int delta;
-    // 2. 根据棋子确定走法
+    if ((pcSrc & pcSelfSide) == 0) { continue; }
+int delta;
     for(delta=0;delta<=3;delta++)
     {
-    	sqDst=sqSrc+ccDelta[delta];
-    	if(!IN_BOARD(sqDst)||INSHOUXUE(sqDst,pcSelfSide)) continue;
-    	pcDst = ucpcSquares[sqDst];
-    	if(!CanMove(sqSrc,sqDst))continue;
-    	if(!ucpcSquares[sqDst]&&bCapture) continue;
+    sqDst=sqSrc+ccDelta[delta];
+    if(!IN_BOARD(sqDst)||INSHOUXUE(sqDst,pcSelfSide)) continue;
+    pcDst = ucpcSquares[sqDst];
+    if(!CanMove(sqSrc,sqDst))continue;
+    if(!ucpcSquares[sqDst]&&bCapture) continue;
         if (ucpcSquares[sqDst] ? ((pcDst & pcOppSide) != 0  && CanEat(sqSrc,sqDst) ): (pcDst & pcSelfSide) == 0) {
           mvs[nGenMoves] = MOVE(sqSrc, sqDst);
           nGenMoves ++;
         }
-	}
-	for(delta=0;delta<=3;delta++)
-	{
-    	sqDst=sqSrc+ccJumpDelta[delta];
-    	if(!IN_BOARD(sqDst)||INSHOUXUE(sqDst,pcSelfSide)) continue;
-    	pcDst = ucpcSquares[sqDst];
-    	if(!CanJump(sqSrc,sqDst))continue;
-    	if(!ucpcSquares[sqDst]&&bCapture) continue;
+}
+for(delta=0;delta<=3;delta++)
+{
+    sqDst=sqSrc+ccJumpDelta[delta];
+    if(!IN_BOARD(sqDst)||INSHOUXUE(sqDst,pcSelfSide)) continue;
+    pcDst = ucpcSquares[sqDst];
+    if(!CanJump(sqSrc,sqDst))continue;
+    if(!ucpcSquares[sqDst]&&bCapture) continue;
         if (ucpcSquares[sqDst] ?  ((pcDst & pcOppSide) != 0  && CanEat(sqSrc,sqDst) ): (pcDst & pcSelfSide) == 0) {
           mvs[nGenMoves] = MOVE(sqSrc, sqDst);
           nGenMoves ++;
         }
-	}
+}
   }
   return nGenMoves;
 }
 
-// 判断走法是否合理
 bool PositionStruct::LegalMove(int mv){
   int sqSrc, sqDst;
   int pcSelfSide,pcOppSide, pcSrc, pcDst;
-  // 判断走法是否合法，需要经过以下的判断过程：
-
-  // 1. 判断起始格是否有自己的棋子
   sqSrc = SRC(mv);
   pcSrc = ucpcSquares[sqSrc];
   pcSelfSide = SIDE_TAG(sdPlayer);
   pcOppSide = OPP_SIDE_TAG(sdPlayer);
-  if ((pcSrc & pcSelfSide) == 0) {
-    return 0;
-  }
-
-  // 2. 判断目标格是否有自己的棋子
+  if ((pcSrc & pcSelfSide) == 0) { return 0; }
   sqDst = DST(mv);
   pcDst = ucpcSquares[sqDst];
-  if ((pcDst & pcSelfSide) != 0) {
-    return 0;
-  }
+  if ((pcDst & pcSelfSide) != 0) { return 0; }
   int delta;
-  // 2. 根据棋子确定走法
     for(delta=0;delta<=3;delta++)
     {
-    	int sqDst2=sqSrc+ccDelta[delta];
-    	if(!IN_BOARD(sqDst)||INSHOUXUE(sqDst,pcSelfSide)||sqDst2!=sqDst) continue;
-    	pcDst = ucpcSquares[sqDst];
-    	if(!CanMove(sqSrc,sqDst))continue;
+    int sqDst2=sqSrc+ccDelta[delta];
+    if(!IN_BOARD(sqDst)||INSHOUXUE(sqDst,pcSelfSide)||sqDst2!=sqDst) continue;
+    pcDst = ucpcSquares[sqDst];
+    if(!CanMove(sqSrc,sqDst))continue;
         if (ucpcSquares[sqDst] ? ((pcDst & pcOppSide) != 0  && CanEat(sqSrc,sqDst) ): (pcDst & pcSelfSide) == 0) {
-        	return 1;
+        return 1;
         }
-	}
+}
     for(delta=0;delta<=3;delta++)
     {
-    	int sqDst2=sqSrc+ccJumpDelta[delta];
-    	if(!IN_BOARD(sqDst)||INSHOUXUE(sqDst,pcSelfSide)||sqDst2!=sqDst) continue;
-    	pcDst = ucpcSquares[sqDst];
-    	if(!CanJump(sqSrc,sqDst))continue;
+    int sqDst2=sqSrc+ccJumpDelta[delta];
+    if(!IN_BOARD(sqDst)||INSHOUXUE(sqDst,pcSelfSide)||sqDst2!=sqDst) continue;
+    pcDst = ucpcSquares[sqDst];
+    if(!CanJump(sqSrc,sqDst))continue;
         if (ucpcSquares[sqDst] ? ((pcDst & pcOppSide) != 0  && CanEat(sqSrc,sqDst) ): (pcDst & pcSelfSide) == 0) {
-        	return 1;
+        return 1;
         }
-	}
-	return 0;
+}
+return 0;
 }
 
-// 判断是否被杀
 bool PositionStruct::IsMate(void) {
-	if(((ucpcSquares[99]>=8&&ucpcSquares[99]<=23)&&!sdPlayer)||((ucpcSquares[107]>=8&&ucpcSquares[107]<=23)&&sdPlayer)) return 1;
-	return 0;
+if(((ucpcSquares[99]>=8&&ucpcSquares[99]<=23)&&!sdPlayer)||((ucpcSquares[107]>=8&&ucpcSquares[107]<=23)&&sdPlayer)) return 1;
+return 0;
 }
 bool PositionStruct::RepWuLai(void){
-	if(nMoveNum<=15) return 0;
-	if(LegalMove(MOVE(DST(mvsList[nMoveNum-2].wmv),SRC(mvsList[nMoveNum-1].wmv)))) return 0;
-	int count[24][256];
-	memset(count,0,sizeof(count));
-	for(int i=nMoveNum-3;i>=nMoveNum-16&&i>=1;i-=2)
-	{
-		if(INXIANJING(DST(mvsList[i].wmv),16)||INXIANJING(DST(mvsList[i].wmv),8))
-		{
-			return 0;
-		}
-		count[mvsList[i].wpc][DST(mvsList[i].wmv)]++;
-		if(count[mvsList[i].wpc][DST(mvsList[i].wmv)]>=3&&DST(mvsList[i].wmv)==DST(mvsList[nMoveNum-1].wmv))
-		{
-			return 1;
-		}
-	}
-	return 0;
+if(nMoveNum<=15) return 0;
+if(LegalMove(MOVE(DST(mvsList[nMoveNum-2].wmv),SRC(mvsList[nMoveNum-1].wmv)))) return 0;
+int count[24][256];
+memset(count,0,sizeof(count));
+for(int i=nMoveNum-3;i>=nMoveNum-16&&i>=1;i-=2)
+{
+if(INXIANJING(DST(mvsList[i].wmv),16)||INXIANJING(DST(mvsList[i].wmv),8))
+{
+return 0;
+}
+count[mvsList[i].wpc][DST(mvsList[i].wmv)]++;
+if(count[mvsList[i].wpc][DST(mvsList[i].wmv)]>=3&&DST(mvsList[i].wmv)==DST(mvsList[nMoveNum-1].wmv))
+{
+return 1;
+}
+}
+return 0;
 }
 bool PositionStruct::RepWuSong(void){
-	if(nMoveNum<=35) return 0;
-	int animal=mvsList[nMoveNum-1].wpc,dst=DST(mvsList[nMoveNum-1].wmv),count[6],qigenum=0;
-	memset(count,0,sizeof(count));
-	for(int i=nMoveNum-3;i>=nMoveNum-36&&i>=0;i-=2)
-	{
-		if(INXIANJING(DST(mvsList[i].wmv),16)||INXIANJING(DST(mvsList[i].wmv),8))
-		{
-			return 0;
-		}
-		if(mvsList[i].wpc!=animal) return 0;
-		bool rep=0;
-		for(int j=0;j<qigenum;j++)
-		{
-			if(DST(mvsList[i].wmv)==count[j])
-			{
-				rep=1;
-				break;
-			}
-		}
-		if(rep==0) count[qigenum++]=DST(mvsList[i].wmv);
-		if(qigenum>5) return 0;
-	}
-	for(int j=0;j<qigenum;j++)
-	{
-		if(dst==count[j])
-		{
-			return 1;
-		}
-	}
-	return 0;
+if(nMoveNum<=35) return 0;
+int animal=mvsList[nMoveNum-1].wpc,dst=DST(mvsList[nMoveNum-1].wmv),count[6],qigenum=0;
+memset(count,0,sizeof(count));
+for(int i=nMoveNum-3;i>=nMoveNum-36&&i>=0;i-=2)
+{
+if(INXIANJING(DST(mvsList[i].wmv),16)||INXIANJING(DST(mvsList[i].wmv),8))
+{
+return 0;
+}
+if(mvsList[i].wpc!=animal) return 0;
+bool rep=0;
+for(int j=0;j<qigenum;j++)
+{
+if(DST(mvsList[i].wmv)==count[j])
+{
+rep=1;
+break;
+}
+}
+if(rep==0) count[qigenum++]=DST(mvsList[i].wmv);
+if(qigenum>5) return 0;
+}
+for(int j=0;j<qigenum;j++)
+{
+if(dst==count[j])
+{
+return 1;
+}
+}
+return 0;
 }
 bool PositionStruct::RepStatus(void) {
-
-	if(RepWuLai())
-	{
-		return 1;
-	}
-	if(RepWuSong())
-	{
-		return 1;
-	}
-
-	return 0;
+if(RepWuLai())
+{
+return 1;
+}
+if(RepWuSong())
+{
+return 1;
+}
+return 0;
 }
 
-static PositionStruct pos; // 局面实例
+static PositionStruct pos;
 
-// 与图形界面有关的全局变量
 static struct {
-  HINSTANCE hInst;                              // 应用程序句柄实例
-  HWND hWnd;                                    // 主窗口句柄
-  HDC hdc, hdcTmp;                              // 设备句柄，只在"ClickSquare"过程中有效
-  HBITMAP bmpBoard, bmpSelected, bmpTrap, bmpDen, bmpPieces[24]; // 资源图片句柄
-  int sqSelected, mvLast;                       // 选中的格子，上一步棋
-  BOOL bGameOver;                     // 是否翻转棋盘，是否游戏结束(不让继续玩下去)
+  HINSTANCE hInst;
+  HWND hWnd;
+  HDC hdc, hdcTmp;
+  HBITMAP bmpBoard, bmpSelected, bmpTrap, bmpDen, bmpPieces[24];
+  int sqSelected, mvLast;
+  BOOL bGameOver;
 } Xqwl;
 
-// 初始化棋局
 void Startup(void) {
   pos.Startup();
   Xqwl.sqSelected = Xqwl.mvLast = 0;
   Xqwl.bGameOver = FALSE;
 }
-//读入局面fen代码
+
 void fen_to_map(char fen[])
 {
-	Startup();
-	pos.ClearBoard();
-	int x,y,i;
-	x=FILE_LEFT;
-	y=RANK_TOP;
-	for(i=0;y<=RANK_BOTTOM;i++)
-	{
-		if(fen[i]=='/'||fen[i]==' ')
-		{
-			x=FILE_LEFT;
-			y++;
-		}
-		else if(fen[i]>='0'&&fen[i]<='9')
-		{
-			for(int j=1;j<=fen[i]-'0';j++)
-			{
-				x++;
-			}
-		}
-		else if(fen[i]!=' ')
-		{
-			switch(fen[i])
-			{
-				case 'w': pos.AddPiece(COORD_XY(x,y),20); break;
-				case 'p': pos.AddPiece(COORD_XY(x,y),19); break;
-				case 't': pos.AddPiece(COORD_XY(x,y),18); break;
-				case 'l': pos.AddPiece(COORD_XY(x,y),17); break;
-				case 'e': pos.AddPiece(COORD_XY(x,y),16); break;
-				case 'd': pos.AddPiece(COORD_XY(x,y),21); break;
-				case 'c': pos.AddPiece(COORD_XY(x,y),22); break;
-				case 'm': pos.AddPiece(COORD_XY(x,y),23); break;
-				case 'W': pos.AddPiece(COORD_XY(x,y),12); break;
-				case 'P': pos.AddPiece(COORD_XY(x,y),11); break;
-				case 'T': pos.AddPiece(COORD_XY(x,y),10); break;
-				case 'L': pos.AddPiece(COORD_XY(x,y),9); break;
-				case 'E': pos.AddPiece(COORD_XY(x,y),8); break;
-				case 'D': pos.AddPiece(COORD_XY(x,y),13); break;
-				case 'C': pos.AddPiece(COORD_XY(x,y),14); break;
-				case 'M': pos.AddPiece(COORD_XY(x,y),15); break;
-			}
-			x++;
-		}
-	}
-	if(fen[i]!='r') pos.ChangeSide();
-	pos.SetIrrev();
-	pos.SetIrrev2();
-	Xqwl.sqSelected = Xqwl.mvLast = 0;
-	Xqwl.bGameOver = 0;
+Startup();
+pos.ClearBoard();
+int x,y,i;
+x=FILE_LEFT;
+y=RANK_TOP;
+for(i=0;y<=RANK_BOTTOM;i++)
+{
+if(fen[i]=='/'||fen[i]==' ')
+{
+x=FILE_LEFT;
+y++;
+}
+else if(fen[i]>='0'&&fen[i]<='9')
+{
+for(int j=1;j<=fen[i]-'0';j++)
+{
+x++;
+}
+}
+else if(fen[i]!=' ')
+{
+switch(fen[i])
+{
+case 'w': pos.AddPiece(COORD_XY(x,y),20); break;
+case 'p': pos.AddPiece(COORD_XY(x,y),19); break;
+case 't': pos.AddPiece(COORD_XY(x,y),18); break;
+case 'l': pos.AddPiece(COORD_XY(x,y),17); break;
+case 'e': pos.AddPiece(COORD_XY(x,y),16); break;
+case 'd': pos.AddPiece(COORD_XY(x,y),21); break;
+case 'c': pos.AddPiece(COORD_XY(x,y),22); break;
+case 'm': pos.AddPiece(COORD_XY(x,y),23); break;
+case 'W': pos.AddPiece(COORD_XY(x,y),12); break;
+case 'P': pos.AddPiece(COORD_XY(x,y),11); break;
+case 'T': pos.AddPiece(COORD_XY(x,y),10); break;
+case 'L': pos.AddPiece(COORD_XY(x,y),9); break;
+case 'E': pos.AddPiece(COORD_XY(x,y),8); break;
+case 'D': pos.AddPiece(COORD_XY(x,y),13); break;
+case 'C': pos.AddPiece(COORD_XY(x,y),14); break;
+case 'M': pos.AddPiece(COORD_XY(x,y),15); break;
+}
+x++;
+}
+}
+if(fen[i]!='r') pos.ChangeSide();
+pos.SetIrrev();
+pos.SetIrrev2();
+Xqwl.sqSelected = Xqwl.mvLast = 0;
+Xqwl.bGameOver = 0;
 }
 
-
-
-// 与搜索有关的全局变量
 static struct {
-  int mvResult;                  // 电脑走的棋
+  int mvResult;
   char fen[1024];
 } Search;
 
-
-
 void map_to_fen(void)
 {
-	strcpy(Search.fen,"\0");
-	int x,y,empty=0;
-	for(y=RANK_TOP;y<=RANK_BOTTOM;y++)
-	{
-		for(x=FILE_LEFT;x<=FILE_RIGHT;x++)
-		{
-			int sq=COORD_XY(x,y);
-			if(pos.ucpcSquares[sq]==0)
-			{
-				empty++;
-			}
-			else
-			{
-				if(empty>=1)
-				{
-					char aa[3];
-					aa[0]=empty+'0';
-					aa[1]='\0';
-					strcat(Search.fen,aa);
-					empty=0;
-				}
-				switch(pos.ucpcSquares[sq])
-				{
-					case 8: strcat(Search.fen,"E"); break;
-					case 9: strcat(Search.fen,"L"); break;
-					case 10: strcat(Search.fen,"T"); break;
-					case 11: strcat(Search.fen,"P"); break;
-					case 12: strcat(Search.fen,"W"); break;
-					case 13: strcat(Search.fen,"D"); break;
-					case 14: strcat(Search.fen,"C"); break;
-					case 15: strcat(Search.fen,"M"); break;
-					case 16: strcat(Search.fen,"e"); break;
-					case 17: strcat(Search.fen,"l"); break;
-					case 18: strcat(Search.fen,"t"); break;
-					case 19: strcat(Search.fen,"p"); break;
-					case 20: strcat(Search.fen,"w"); break;
-					case 21: strcat(Search.fen,"d"); break;
-					case 22: strcat(Search.fen,"c"); break;
-					case 23: strcat(Search.fen,"m"); break;
-				}
-			}
-		}
-		if(empty>=1)
-		{
-			char aa[3];
-			aa[0]=empty+'0';
-			aa[1]='\0';
-			strcat(Search.fen,aa);
-			empty=0;
-		}
-		if(y<RANK_BOTTOM) strcat(Search.fen,"/");
-	}
-	if(pos.sdPlayer) strcat(Search.fen," b");
-	else strcat(Search.fen," r");
+strcpy(Search.fen,"\0");
+int x,y,empty=0;
+for(y=RANK_TOP;y<=RANK_BOTTOM;y++)
+{
+for(x=FILE_LEFT;x<=FILE_RIGHT;x++)
+{
+int sq=COORD_XY(x,y);
+if(pos.ucpcSquares[sq]==0)
+{
+empty++;
+}
+else
+{
+if(empty>=1)
+{
+char aa[3];
+aa[0]=empty+'0';
+aa[1]='\0';
+strcat(Search.fen,aa);
+empty=0;
+}
+switch(pos.ucpcSquares[sq])
+{
+case 8: strcat(Search.fen,"E"); break;
+case 9: strcat(Search.fen,"L"); break;
+case 10: strcat(Search.fen,"T"); break;
+case 11: strcat(Search.fen,"P"); break;
+case 12: strcat(Search.fen,"W"); break;
+case 13: strcat(Search.fen,"D"); break;
+case 14: strcat(Search.fen,"C"); break;
+case 15: strcat(Search.fen,"M"); break;
+case 16: strcat(Search.fen,"e"); break;
+case 17: strcat(Search.fen,"l"); break;
+case 18: strcat(Search.fen,"t"); break;
+case 19: strcat(Search.fen,"p"); break;
+case 20: strcat(Search.fen,"w"); break;
+case 21: strcat(Search.fen,"d"); break;
+case 22: strcat(Search.fen,"c"); break;
+case 23: strcat(Search.fen,"m"); break;
+}
+}
+}
+if(empty>=1)
+{
+char aa[3];
+aa[0]=empty+'0';
+aa[1]='\0';
+strcat(Search.fen,aa);
+empty=0;
+}
+if(y<RANK_BOTTOM) strcat(Search.fen,"/");
+}
+if(pos.sdPlayer) strcat(Search.fen," b");
+else strcat(Search.fen," r");
 }
 void map_to_fen2(int undomoves)
 {
-	int i;
-	for(i=0;i<undomoves;i++)
-	{
-		pos.UndoMakeMove();
-	}
-	strcpy(Search.fen,"\0");
-	int x,y,empty=0;
-	for(y=RANK_TOP;y<=RANK_BOTTOM;y++)
-	{
-		for(x=FILE_LEFT;x<=FILE_RIGHT;x++)
-		{
-			int sq=COORD_XY(x,y);
-			if(pos.ucpcSquares[sq]==0)
-			{
-				empty++;
-			}
-			else
-			{
-				if(empty>=1)
-				{
-					char aa[3];
-					aa[0]=empty+'0';
-					aa[1]='\0';
-					strcat(Search.fen,aa);
-					empty=0;
-				}
-				switch(pos.ucpcSquares[sq])
-				{
-					case 8: strcat(Search.fen,"E"); break;
-					case 9: strcat(Search.fen,"L"); break;
-					case 10: strcat(Search.fen,"T"); break;
-					case 11: strcat(Search.fen,"P"); break;
-					case 12: strcat(Search.fen,"W"); break;
-					case 13: strcat(Search.fen,"D"); break;
-					case 14: strcat(Search.fen,"C"); break;
-					case 15: strcat(Search.fen,"M"); break;
-					case 16: strcat(Search.fen,"e"); break;
-					case 17: strcat(Search.fen,"l"); break;
-					case 18: strcat(Search.fen,"t"); break;
-					case 19: strcat(Search.fen,"p"); break;
-					case 20: strcat(Search.fen,"w"); break;
-					case 21: strcat(Search.fen,"d"); break;
-					case 22: strcat(Search.fen,"c"); break;
-					case 23: strcat(Search.fen,"m"); break;
-				}
-			}
-		}
-		if(empty>=1)
-		{
-			char aa[3];
-			aa[0]=empty+'0';
-			aa[1]='\0';
-			strcat(Search.fen,aa);
-			empty=0;
-		}
-		if(y<RANK_BOTTOM) strcat(Search.fen,"/");
-	}
-	if(pos.sdPlayer) strcat(Search.fen," b");
-	else strcat(Search.fen," r");
-	strcat(Search.fen," moves");
-	for(i=0;i<undomoves;i++)
-	{
-		int mv=pos.mvsList[pos.nMoveNum].wmv; 
-		pos.MakeMove(mv);
-		char tofour[15]="\0";
-		sprintf(tofour," %c%c%c%c",FILE_X(SRC(mv))+'a'-3,RANK_Y(SRC(mv))+'0'-3,FILE_X(DST(mv))+'a'-3,RANK_Y(DST(mv))+'0'-3);
-		strcat(Search.fen,tofour);
-	}
+int i;
+for(i=0;i<undomoves;i++)
+{
+pos.UndoMakeMove();
+}
+strcpy(Search.fen,"\0");
+int x,y,empty=0;
+for(y=RANK_TOP;y<=RANK_BOTTOM;y++)
+{
+for(x=FILE_LEFT;x<=FILE_RIGHT;x++)
+{
+int sq=COORD_XY(x,y);
+if(pos.ucpcSquares[sq]==0)
+{
+empty++;
+}
+else
+{
+if(empty>=1)
+{
+char aa[3];
+aa[0]=empty+'0';
+aa[1]='\0';
+strcat(Search.fen,aa);
+empty=0;
+}
+switch(pos.ucpcSquares[sq])
+{
+case 8: strcat(Search.fen,"E"); break;
+case 9: strcat(Search.fen,"L"); break;
+case 10: strcat(Search.fen,"T"); break;
+case 11: strcat(Search.fen,"P"); break;
+case 12: strcat(Search.fen,"W"); break;
+case 13: strcat(Search.fen,"D"); break;
+case 14: strcat(Search.fen,"C"); break;
+case 15: strcat(Search.fen,"M"); break;
+case 16: strcat(Search.fen,"e"); break;
+case 17: strcat(Search.fen,"l"); break;
+case 18: strcat(Search.fen,"t"); break;
+case 19: strcat(Search.fen,"p"); break;
+case 20: strcat(Search.fen,"w"); break;
+case 21: strcat(Search.fen,"d"); break;
+case 22: strcat(Search.fen,"c"); break;
+case 23: strcat(Search.fen,"m"); break;
+}
+}
+}
+if(empty>=1)
+{
+char aa[3];
+aa[0]=empty+'0';
+aa[1]='\0';
+strcat(Search.fen,aa);
+empty=0;
+}
+if(y<RANK_BOTTOM) strcat(Search.fen,"/");
+}
+if(pos.sdPlayer) strcat(Search.fen," b");
+else strcat(Search.fen," r");
+strcat(Search.fen," moves");
+for(i=0;i<undomoves;i++)
+{
+int mv=pos.mvsList[pos.nMoveNum].wmv;
+pos.MakeMove(mv);
+char tofour[15]="\0";
+sprintf(tofour," %c%c%c%c",FILE_X(SRC(mv))+'a'-3,RANK_Y(SRC(mv))+'0'-3,FILE_X(DST(mv))+'a'-3,RANK_Y(DST(mv))+'0'-3);
+strcat(Search.fen,tofour);
+}
 }
 
-// TransparentBlt 的替代函数，用来修正原函数在 Windows 98 下资源泄漏的问题
 static void TransparentBlt2(HDC hdcDest, int nXOriginDest, int nYOriginDest, int nWidthDest, int nHeightDest,
-    HDC hdcSrc, int nXOriginSrc, int nYOriginSrc, int nWidthSrc, int nHeightSrc, UINT crTransparent) {
+    HDC hdcSrc, int nXOriginSrc, int nYOriginSrc, int nWidthSrc, int nHeightSrc, UINT crTransparent, bool bFlip180 = false) {
   HDC hImageDC, hMaskDC;
   HBITMAP hOldImageBMP, hImageBMP, hOldMaskBMP, hMaskBMP;
-
   hImageBMP = CreateCompatibleBitmap(hdcDest, nWidthDest, nHeightDest);
   hMaskBMP = CreateBitmap(nWidthDest, nHeightDest, 1, 1, NULL);
   hImageDC = CreateCompatibleDC(hdcDest);
   hMaskDC = CreateCompatibleDC(hdcDest);
   hOldImageBMP = (HBITMAP) SelectObject(hImageDC, hImageBMP);
   hOldMaskBMP = (HBITMAP) SelectObject(hMaskDC, hMaskBMP);
-
-  if (nWidthDest == nWidthSrc && nHeightDest == nHeightSrc) {
+  if (bFlip180) {
+    StretchBlt(hImageDC, nWidthDest - 1, 0, -nWidthDest, nHeightDest,
+        hdcSrc, nXOriginSrc, nYOriginSrc, nWidthSrc, nHeightSrc, SRCCOPY);
+  } else if (nWidthDest == nWidthSrc && nHeightDest == nHeightSrc) {
     BitBlt(hImageDC, 0, 0, nWidthDest, nHeightDest,
         hdcSrc, nXOriginSrc, nYOriginSrc, SRCCOPY);
   } else {
@@ -910,7 +772,6 @@ static void TransparentBlt2(HDC hdcDest, int nXOriginDest, int nYOriginDest, int
       hMaskDC, 0, 0, SRCAND);
   BitBlt(hdcDest, nXOriginDest, nYOriginDest, nWidthDest, nHeightDest,
       hImageDC, 0, 0, SRCPAINT);
-
   SelectObject(hImageDC, hOldImageBMP);
   DeleteDC(hImageDC);
   SelectObject(hMaskDC, hOldMaskBMP);
@@ -918,41 +779,99 @@ static void TransparentBlt2(HDC hdcDest, int nXOriginDest, int nYOriginDest, int
   DeleteObject(hImageBMP);
   DeleteObject(hMaskBMP);
 }
-// 绘制透明图片
-inline void DrawTransBmp(HDC hdc, HDC hdcTmp, int xx, int yy, HBITMAP bmp) {
+
+inline void DrawTransBmp(HDC hdc, HDC hdcTmp, int xx, int yy, HBITMAP bmp, bool bFlip180 = false) {
   SelectObject(hdcTmp, bmp);
-  TransparentBlt2(hdc, xx, yy, SQUARE_SIZE, SQUARE_SIZE, hdcTmp, 0, 0, SQUARE_SIZE, SQUARE_SIZE, MASK_COLOR);
+  TransparentBlt2(hdc, xx, yy, SQUARE_SIZE, SQUARE_SIZE, hdcTmp, 0, 0, SQUARE_SIZE, SQUARE_SIZE, MASK_COLOR, bFlip180);
 }
 
-// 绘制棋盘
+bool g_bBoardFlipped = false;
+static volatile bool g_bPondering = false;
+
+static volatile int g_ponderDepth = 0;
+static volatile int g_ponderScore = 0;
+static char g_ponderMoveStr[32] = "";
+static HWND g_hPonderDlg = NULL;
+
+static volatile bool g_bPonderHitSent = false;
+static int g_ponderMove = 0;
+static volatile int g_pendingApplyMove = 0;
+static int g_lastPV[16];
+static int g_lastPVCount = 0;
+static volatile LONG g_ponderGeneration = 0;
+static volatile bool g_bWaitingForClickResult = false;
+
+struct ComputeThreadParam {
+    volatile bool bRunning;
+    volatile bool bCancelled;
+    LONG generation;
+    int mvResult;
+};
+static ComputeThreadParam g_computeParam = { false, false, 0, 0 };
+static HANDLE g_hComputeThread = NULL;
+static volatile bool g_bComputerThinking = false;
+static const UINT WM_ENGINE_MOVE_READY = WM_APP + 6;
+static const UINT WM_ENGINE_MOVE_DONE  = WM_APP + 7;
+
+inline int DisplayXX(int x) {
+    return g_bBoardFlipped
+        ? BOARD_EDGE + (FILE_RIGHT - x) * SQUARE_SIZE
+        : BOARD_EDGE + (x - FILE_LEFT) * SQUARE_SIZE;
+}
+inline int DisplayYY(int y) {
+    return g_bBoardFlipped
+        ? BOARD_EDGE + (RANK_BOTTOM - y) * SQUARE_SIZE
+        : BOARD_EDGE + (y - RANK_TOP) * SQUARE_SIZE;
+}
+
+static void UpdateTitle(void) {
+  char title[256];
+  const char *side = pos.sdPlayer ? "\xc0\xb6\xb7\xbd" : "\xba\xec\xb7\xbd";
+  char ponderTag[160] = "";
+  if (g_bPondering) {
+    if (g_ponderDepth > 0) {
+      sprintf(ponderTag, "\xa3\xa8\xba\xf3\xcc\xa8\xcb\xbc\xbf\xbc\xd6\xd0 [\xc9\xee\xb6\xc8%d \xc6\xc0\xb7\xd6%+d \xd5\xd0\xb7\xa8%s]\xa3\xa9",
+          g_ponderDepth, g_ponderScore, g_ponderMoveStr);
+    } else {
+      sprintf(ponderTag, "\xa3\xa8\xba\xf3\xcc\xa8\xcb\xbc\xbf\xbc\xd6\xd0\xa1\xad\xa3\xa9");
+    }
+  }
+  if (Xqwl.bGameOver) {
+    sprintf(title, "\xb6\xb7\xca\xde\xc6\xe5 AI - \xd3\xce\xcf\xb7\xbd\xe1\xca\xf8%s", ponderTag);
+  } else {
+    sprintf(title, "\xb6\xb7\xca\xde\xc6\xe5 AI - \xb5\xda%d\xbb\xd8\xba\xcf\xa3\xac\xc2\xd6\xb5\xbd%s\xd7\xdf%s", (pos.nMoveNum + 1) / 2, side, ponderTag);
+  }
+  SetWindowText(Xqwl.hWnd, title);
+}
+
 static void DrawBoard(HDC hdc) {
   int x, y, xx, yy, sq, pc;
   HDC hdcTmp;
 
-  // 画棋盘
+  UpdateTitle();
+
   hdcTmp = CreateCompatibleDC(hdc);
   SelectObject(hdcTmp, Xqwl.bmpBoard);
   BitBlt(hdc, 0, 0, BOARD_WIDTH, BOARD_HEIGHT, hdcTmp, 0, 0, SRCCOPY);
-  // 画棋子
   for (x = FILE_LEFT; x <= FILE_RIGHT; x ++) {
     for (y = RANK_TOP; y <= RANK_BOTTOM; y ++) {
-        xx = BOARD_EDGE + (x - FILE_LEFT) * SQUARE_SIZE;
-        yy = BOARD_EDGE + (y - RANK_TOP) * SQUARE_SIZE;
+        xx = DisplayXX(x);
+        yy = DisplayYY(y);
       sq = COORD_XY(x, y);
       pc = pos.ucpcSquares[sq];
-      	switch(ccInFort[sq])
-      	{
-      		case 1:
-      		case 5:
-      		{
-      			DrawTransBmp(hdc, hdcTmp, xx, yy, Xqwl.bmpDen);
-      			break;
-			}
-      		case 2:
-      		case 4: DrawTransBmp(hdc, hdcTmp, xx, yy, Xqwl.bmpTrap);
-		}
+      switch(ccInFort[sq])
+      {
+      case 1:
+      case 5:
+      {
+      DrawTransBmp(hdc, hdcTmp, xx, yy, Xqwl.bmpDen);
+      break;
+}
+      case 2:
+      case 4: DrawTransBmp(hdc, hdcTmp, xx, yy, Xqwl.bmpTrap);
+}
       if (pc != 0) {
-        DrawTransBmp(hdc, hdcTmp, xx, yy, Xqwl.bmpPieces[pc]);
+        DrawTransBmp(hdc, hdcTmp, xx, yy, Xqwl.bmpPieces[pc], g_bBoardFlipped);
       }
       if (sq == Xqwl.sqSelected || sq == SRC(Xqwl.mvLast) || sq == DST(Xqwl.mvLast)) {
         DrawTransBmp(hdc, hdcTmp, xx, yy, Xqwl.bmpSelected);
@@ -962,120 +881,396 @@ static void DrawBoard(HDC hdc) {
   DeleteDC(hdcTmp);
 }
 
-// 播放资源声音
 inline void PlayResWav(int nResId) {
   PlaySound(MAKEINTRESOURCE(nResId), Xqwl.hInst, SND_ASYNC | SND_NOWAIT | SND_RESOURCE);
 }
 
-// "DrawSquare"参数
 const BOOL DRAW_SELECTED = TRUE;
 
-// 绘制格子
 static void DrawSquare(int sq, BOOL bSelected = FALSE) {
   int sqFlipped, xx, yy, pc;
 
   sqFlipped = sq;
-  xx = BOARD_EDGE + (FILE_X(sqFlipped) - FILE_LEFT) * SQUARE_SIZE;
-  yy = BOARD_EDGE + (RANK_Y(sqFlipped) - RANK_TOP) * SQUARE_SIZE;
+  xx = DisplayXX(FILE_X(sqFlipped));
+  yy = DisplayYY(RANK_Y(sqFlipped));
   SelectObject(Xqwl.hdcTmp, Xqwl.bmpBoard);
   BitBlt(Xqwl.hdc, xx, yy, SQUARE_SIZE, SQUARE_SIZE, Xqwl.hdcTmp, xx, yy, SRCCOPY);
 
   pc = pos.ucpcSquares[sq];
-      	switch(ccInFort[sq])
-      	{
-      		case 1:
-      		case 5:
-      		{
-      			DrawTransBmp(Xqwl.hdc, Xqwl.hdcTmp, xx, yy, Xqwl.bmpDen);
-      			break;
-			}
-      		case 2:
-      		case 4: DrawTransBmp(Xqwl.hdc, Xqwl.hdcTmp, xx, yy, Xqwl.bmpTrap);
-		}
+      switch(ccInFort[sq])
+      {
+      case 1:
+      case 5:
+      {
+      DrawTransBmp(Xqwl.hdc, Xqwl.hdcTmp, xx, yy, Xqwl.bmpDen);
+      break;
+}
+      case 2:
+      case 4: DrawTransBmp(Xqwl.hdc, Xqwl.hdcTmp, xx, yy, Xqwl.bmpTrap);
+}
   if (pc != 0) {
-    DrawTransBmp(Xqwl.hdc, Xqwl.hdcTmp, xx, yy, Xqwl.bmpPieces[pc]);
+    DrawTransBmp(Xqwl.hdc, Xqwl.hdcTmp, xx, yy, Xqwl.bmpPieces[pc], g_bBoardFlipped);
   }
   if (bSelected) {
     DrawTransBmp(Xqwl.hdc, Xqwl.hdcTmp, xx, yy, Xqwl.bmpSelected);
   }
 }
+
+static void ParseInfoPV(const char *input);
+static void StopPondering(void);
+
+static void ResetAnalysisState(void) {
+  g_ponderDepth = 0;
+  g_ponderScore = 0;
+  g_ponderMoveStr[0] = '\0';
+  g_ponderMove = 0;
+  g_pendingApplyMove = 0;
+  g_bPonderHitSent = false;
+  g_bPondering = false;
+  g_lastPVCount = 0;
+}
+
+static bool ParseMove4(const char *s, int &mv) {
+  if (s == NULL) return false;
+  if (!(s[0] >= 'a' && s[0] <= 'i' &&
+        s[1] >= '0' && s[1] <= '9' &&
+        s[2] >= 'a' && s[2] <= 'i' &&
+        s[3] >= '0' && s[3] <= '9')) {
+    return false;
+  }
+  int a=s[0]-'a'+3, b=s[1]-'0'+3, c=s[2]-'a'+3, d=s[3]-'0'+3;
+  mv = MOVE(COORD_XY(a,b), COORD_XY(c,d));
+  return true;
+}
+
+static void SendCurrentPositionToEngine(void) {
+  char input[1200];
+  map_to_fen2((pos.nMoveNum-1>=40)?40:(pos.nMoveNum-1));
+  sprintf(input,"fen %s",Search.fen);
+  pipeStdHandle.LineOutput(input);
+}
+
+static void SendPonderPositionToEngine(int ponderMove) {
+  char input[1200];
+  pos.MakeMove(ponderMove);
+  map_to_fen2((pos.nMoveNum-1>=40)?40:(pos.nMoveNum-1));
+  sprintf(input,"fen %s",Search.fen);
+  pos.UndoMakeMove();
+  pipeStdHandle.LineOutput(input);
+}
+
+static void BuildGoCommand(char *outBuf, bool bPonder) {
+  if (bPonder) {
+    sprintf(outBuf, "go ponder");
+  } else if (depth != 99999999) {
+    sprintf(outBuf, "go depth %d", depth);
+  } else {
+    sprintf(outBuf, "go time %d", t2);
+  }
+}
+
+static bool WaitEngineBootReady(DWORD timeoutMs) {
+  char input[1024] = "";
+  DWORD start = GetTickCount();
+  while (GetTickCount() - start < timeoutMs) {
+    if (pipeStdHandle.LineInput(input)) {
+      if (strcmp(input, "uaciok") == 0) {
+        return true;
+      }
+    } else {
+      Sleep(1);
+    }
+  }
+  return false;
+}
+
+static void CleanupComputeHandle(void) {
+    if (g_hComputeThread) {
+        WaitForSingleObject(g_hComputeThread, 3000);
+        CloseHandle(g_hComputeThread);
+        g_hComputeThread = NULL;
+    }
+    g_computeParam.bRunning = false;
+    g_bComputerThinking = false;
+}
+
+static DWORD WINAPI ComputeThread(LPVOID lpParam) {
+    ComputeThreadParam *param = (ComputeThreadParam*)lpParam;
+    char input[1024];
+    LONG myGeneration = param->generation;
+    while (param->bRunning) {
+        if (pipeStdHandle.LineInput(input)) {
+            if (!strncmp(input,"bestmove ",9)) {
+                int mv = 0;
+                if (ParseMove4(input + 9, mv)) {
+                    param->mvResult = mv;
+                    PostMessage(Xqwl.hWnd, WM_ENGINE_MOVE_READY, (WPARAM)myGeneration, (LPARAM)mv);
+                } else {
+                    param->mvResult = 0;
+                    PostMessage(Xqwl.hWnd, WM_ENGINE_MOVE_DONE, (WPARAM)myGeneration, 0);
+                }
+                break;
+            }
+            if (!strncmp(input,"info",4)) ParseInfoPV(input);
+        } else {
+            Sleep(1);
+        }
+    }
+    param->bRunning = false;
+    return 0;
+}
+
+static bool StartComputerMove(void) {
+    char input[1024];
+    if (g_bComputerThinking) return false;
+    StopPondering();
+    SendCurrentPositionToEngine();
+    Sleep(5);
+    BuildGoCommand(input, false);
+    pipeStdHandle.LineOutput(input);
+    Sleep(5);
+    g_lastPVCount = 0;
+    g_computeParam.bCancelled = false;
+    g_computeParam.mvResult = 0;
+    g_computeParam.bRunning = true;
+    g_computeParam.generation = InterlockedIncrement(&g_ponderGeneration);
+    g_hComputeThread = CreateThread(NULL, 0, ComputeThread, &g_computeParam, 0, NULL);
+    if (g_hComputeThread == NULL) {
+        g_computeParam.bRunning = false;
+        return false;
+    }
+    g_bComputerThinking = true;
+    SetCursor((HCURSOR) LoadImage(NULL, IDC_WAIT, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
+    return true;
+}
+
+static INT_PTR CALLBACK PonderDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+  switch (uMsg) {
+  case WM_CLOSE:
+    DestroyWindow(hDlg);
+    g_hPonderDlg = NULL;
+    return TRUE;
+  case WM_APP+3: {
+    char line[256];
+    sprintf(line, "\xc9\xee\xb6\xc8\x3a\x20%d\r\n\xc6\xc0\xb7\xd6\x3a\x20%+d\r\n\xd5\xd0\xb7\xa8\x3a\x20%s",
+        g_ponderDepth, g_ponderScore, g_ponderMoveStr);
+    SetWindowText(GetDlgItem(hDlg, IDC_PONDER_EDIT), line);
+    return TRUE;
+  }
+  }
+  return FALSE;
+}
+
+struct PonderThreadParam {
+    volatile bool bStop;
+    LONG generation;
+};
+static PonderThreadParam g_ponderParam = { false, 0 };
+static HANDLE g_hPonderThread = NULL;
+static bool g_bPonderEnabled = false;
+static volatile bool g_bPonderSuppressResult = false;
+
+static void ParseInfoPV(const char *input) {
+  const char *p = strstr(input, " pv ");
+  if (!p) return;
+  p += 4;
+  int cnt = 0;
+  while (cnt < 16 && p[0] >= 'a' && p[0] <= 'i' &&
+         p[1] >= '0' && p[1] <= '9' &&
+         p[2] >= 'a' && p[2] <= 'i' &&
+         p[3] >= '0' && p[3] <= '9') {
+    int a = p[0]-'a'+3, b = p[1]-'0'+3, c = p[2]-'a'+3, d = p[3]-'0'+3;
+    g_lastPV[cnt++] = MOVE(COORD_XY(a,b), COORD_XY(c,d));
+    p += 4;
+    while (*p == ' ') p++;
+  }
+  if (cnt > 0) g_lastPVCount = cnt;
+}
+
+static void ParsePonderInfoLine(const char *input) {
+    const char *p;
+    int ldepth = 0, lscore = 0;
+    char rawpv[8] = "";
+
+    ParseInfoPV(input);
+
+    p = strstr(input, "depth");
+    if (p) {
+        ldepth = atoi(p + 6);
+    }
+
+    p = strstr(input, "score");
+    if (p) {
+        lscore = atoi(p + 6);
+    }
+
+    p = strstr(input, " pv ");
+    if (p) {
+        p += 4;
+        strncpy(rawpv, p, 4);
+        rawpv[4] = '\0';
+    }
+
+    if (ldepth <= 0) return;
+
+    g_ponderDepth = ldepth;
+    g_ponderScore = lscore;
+
+    if (strlen(rawpv) >= 4 && rawpv[0] >= 'a' && rawpv[1] >= '0' && rawpv[1] <= '9') {
+        int a = rawpv[0]-'a'+3, b = rawpv[1]-'0'+3;
+        int sq = COORD_XY(a, b);
+        int pc = pos.ucpcSquares[sq];
+        const char *animalName = (pc != 0) ? name[PIECE_NAME(pc)+8] : "";
+        sprintf(g_ponderMoveStr, "%s%c%c\xa1\xfa%c%c",
+            animalName, rawpv[0], rawpv[1], rawpv[2], rawpv[3]);
+    }
+
+    if (Xqwl.hWnd) {
+        PostMessage(Xqwl.hWnd, WM_APP+2, 0, 0);
+    }
+    if (g_hPonderDlg) {
+        PostMessage(g_hPonderDlg, WM_APP+3, 0, 0);
+    }
+}
+
+static DWORD WINAPI PonderThread(LPVOID lpParam) {
+    PonderThreadParam *param = (PonderThreadParam*)lpParam;
+    LONG myGeneration = param->generation;
+    char input[1024];
+    while (true) {
+        if (pipeStdHandle.LineInput(input)) {
+            if (strncmp(input, "bestmove", 8) == 0) {
+                if (g_bPonderSuppressResult) {
+                    PostMessage(Xqwl.hWnd, WM_APP+5, (WPARAM)myGeneration, 0);
+                } else if (g_bPonderHitSent) {
+                    char *point = input + 9;
+                    int mv;
+                    if (ParseMove4(point, mv)) {
+                        g_pendingApplyMove = mv;
+                        PostMessage(Xqwl.hWnd, WM_APP+4, (WPARAM)myGeneration, 0);
+                    } else {
+                        PostMessage(Xqwl.hWnd, WM_APP+5, (WPARAM)myGeneration, 0);
+                    }
+                } else {
+                    PostMessage(Xqwl.hWnd, WM_APP+5, (WPARAM)myGeneration, 0);
+                }
+                break;
+            }
+            if (strncmp(input, "info", 4) == 0) {
+                ParsePonderInfoLine(input);
+            }
+        } else {
+            Sleep(5);
+        }
+    }
+    g_bPondering = false;
+    return 0;
+}
+
+static void StartPondering(void) {
+    if (!g_bPonderEnabled || Xqwl.bGameOver || g_bPondering || training || g_bComputerThinking) return;
+
+    char input[1024];
+    g_ponderDepth = 0;
+    g_ponderScore = 0;
+    g_ponderMoveStr[0] = '\0';
+
+    SendCurrentPositionToEngine();
+    Sleep(5);
+    BuildGoCommand(input, true);
+    pipeStdHandle.LineOutput(input);
+
+    g_bPonderHitSent = false;
+    g_bPonderSuppressResult = false;
+    g_ponderParam.bStop = false;
+    g_ponderParam.generation = InterlockedIncrement(&g_ponderGeneration);
+    g_bPondering = true;
+    g_hPonderThread = CreateThread(NULL, 0, PonderThread, &g_ponderParam, 0, NULL);
+    UpdateTitle();
+    if (g_hPonderDlg) PostMessage(g_hPonderDlg, WM_APP+3, 0, 0);
+}
+
+static void StopPondering(void) {
+    if (!g_bPondering && g_hPonderThread == NULL) return;
+    g_ponderParam.bStop = true;
+    g_bPonderSuppressResult = true;
+    InterlockedIncrement(&g_ponderGeneration);
+    pipeStdHandle.LineOutput("stop");
+    if (g_hPonderThread) {
+        if (WaitForSingleObject(g_hPonderThread, 3000) == WAIT_TIMEOUT) {
+            TerminateThread(g_hPonderThread, 0);
+        }
+        CloseHandle(g_hPonderThread);
+        g_hPonderThread = NULL;
+    }
+    g_bPondering = false;
+    UpdateTitle();
+}
+
+static void CleanupPonderHandle(void) {
+    if (g_hPonderThread) {
+        WaitForSingleObject(g_hPonderThread, 3000);
+        CloseHandle(g_hPonderThread);
+        g_hPonderThread = NULL;
+    }
+    g_bPondering = false;
+}
+
 static void Computer(void)
 {
-	char input[1024];
-	map_to_fen2((pos.nMoveNum-1>=40)?40:(pos.nMoveNum-1));
-	sprintf(input,"fen %s",Search.fen);
-	pipeStdHandle.LineOutput(input);
-	Sleep(5);
-	pipeStdHandle.LineOutput("go time 2000");
-	Sleep(5);
-	while (1) {
-		if(pipeStdHandle.LineInput(input))
-		{
-			if(!strncmp(input,"bestmove ",9)) break;
-		}
-		else Sleep(1);
-	}
-	char *point=input;
-	point+=9;
-	int a=point[0]-'a'+3,b=point[1]-'0'+3,c=point[2]-'a'+3,d=point[3]-'0'+3;
-	int mv=MOVE(COORD_XY(a,b),COORD_XY(c,d));
-	Search.mvResult=mv;
+    StartComputerMove();
 }
-// 电脑回应一步棋
-static void ResponseMove(void) {
-  // 电脑走一步棋
-  SetCursor((HCURSOR) LoadImage(NULL, IDC_WAIT, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
-  Computer();
-  SetCursor((HCURSOR) LoadImage(NULL, IDC_ARROW, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
+
+static void ApplyEngineMove(int mv) {
+  Search.mvResult = mv;
   if(!pos.LegalMove(Search.mvResult))
   {
-    // 如果分出胜负，那么播放胜负的声音，并且弹出不带声音的提示框
-    MessageBox(0,"祝贺你取得胜利！","AnimalcraftAI",0);
+    MessageBox(0,"\xd7\xa3\xba\xd8\xc4\xe3\xc8\xa1\xb5\xc3\xca\xa4\xc0\xfb\xa3\xa1","AnimalcraftAI",0);
     Xqwl.bGameOver = TRUE;
+    UpdateTitle();
+    return;
   }
-  // 清除上一步棋的选择标记
   DrawSquare(SRC(Xqwl.mvLast));
   DrawSquare(DST(Xqwl.mvLast));
-  // 把电脑走的棋标记出来
   pos.MakeMove(Search.mvResult);
   Xqwl.mvLast = Search.mvResult;
   DrawSquare(SRC(Xqwl.mvLast), DRAW_SELECTED);
   DrawSquare(DST(Xqwl.mvLast), DRAW_SELECTED);
  if (pos.IsMate()) {
-    // 如果分出胜负，那么播放胜负的声音，并且弹出不带声音的提示框
-    MessageBox(0,"请再接再厉！","AnimalcraftAI",0);
+    MessageBox(0,"\xc7\xeb\xd4\xd9\xbd\xd3\xd4\xd9\xc0\xf7\xa3\xa1","AnimalcraftAI",0);
     Xqwl.bGameOver = TRUE;
   }else {
-  			if(pos.nMoveNum2>600)
-  			{
-    MessageBox(0,"超过自然限着作和！","AnimalcraftAI",0);
+  if(pos.nMoveNum2>600)
+  {
+    MessageBox(0,"\xb3\xac\xb9\xfd\xd7\xd4\xc8\xbb\xcf\xde\xd7\xc5\xd7\xf7\xba\xcd\xa3\xa1","AnimalcraftAI",0);
     Xqwl.bGameOver = TRUE;
-			  }
-        	else if(pos.RepStatus())
-        	{
-    // 如果分出胜负，那么播放胜负的声音，并且弹出不带声音的提示框
-    MessageBox(0,"祝贺你取得胜利！","AnimalcraftAI",0);
-    Xqwl.bGameOver = TRUE;
-			}
-			else
-			{
-				if(pos.Captured()) pos.SetIrrev2();
-				PlayResWav(IDR_ELEPHANT+PIECE_NAME(pos.mvsList[pos.nMoveNum-1].wpc));
-			}
   }
-
+        else if(pos.RepStatus())
+        {
+    MessageBox(0,"\xd7\xa3\xba\xd8\xc4\xe3\xc8\xa1\xb5\xc3\xca\xa4\xc0\xfb\xa3\xa1","AnimalcraftAI",0);
+    Xqwl.bGameOver = TRUE;
 }
-bool training=0;
-// 点击格子事件处理
+else
+{
+if(pos.Captured()) pos.SetIrrev2();
+PlayResWav(IDR_ELEPHANT+PIECE_NAME(pos.mvsList[pos.nMoveNum-1].wpc));
+}
+  }
+  UpdateTitle();
+}
+
+static void ResponseMove(void) {
+  Computer();
+}
+
 static void ClickSquare(int sq) {
-	char send[1024];
   int pc, mv;
+  if (g_bWaitingForClickResult || g_bComputerThinking) return;
   Xqwl.hdc = GetDC(Xqwl.hWnd);
   Xqwl.hdcTmp = CreateCompatibleDC(Xqwl.hdc);
   pc = pos.ucpcSquares[sq];
 
   if ((pc & SIDE_TAG(pos.sdPlayer)) != 0) {
-    // 如果点击自己的子，那么直接选中该子
     if (Xqwl.sqSelected != 0) {
       DrawSquare(Xqwl.sqSelected);
     }
@@ -1087,7 +1282,6 @@ static void ClickSquare(int sq) {
     }
 
   } else if (Xqwl.sqSelected != 0 && !Xqwl.bGameOver) {
-    // 如果点击的不是自己的子，但有子选中了(一定是自己的子)，那么走这个子
     mv = MOVE(Xqwl.sqSelected, sq);
 
     if (pos.LegalMove(mv)) {
@@ -1098,147 +1292,46 @@ static void ClickSquare(int sq) {
         DrawSquare(sq, DRAW_SELECTED);
         Xqwl.sqSelected = 0;
 
-
-
-        // 检查重复局面
-        
         if (pos.IsMate()) {
-			MessageBox(0,"祝贺你取得胜利！","AnimalcraftAI",0);
+MessageBox(0,"\xd7\xa3\xba\xd8\xc4\xe3\xc8\xa1\xb5\xc3\xca\xa4\xc0\xfb\xa3\xa1","AnimalcraftAI",0);
           Xqwl.bGameOver = TRUE;
         } else if(pos.nMoveNum2>600)
-  			{
-    MessageBox(0,"超过自然限着作和！","AnimalcraftAI",0);
+  {
+    MessageBox(0,"\xb3\xac\xb9\xfd\xd7\xd4\xc8\xbb\xcf\xde\xd7\xc5\xd7\xf7\xba\xcd\xa3\xa1","AnimalcraftAI",0);
           Xqwl.bGameOver = 1;
-			  }
-			else if(pos.RepStatus())
-			{
-				if(pos.RepWuLai()) MessageBox(0,"违例：无赖循环","AnimalcraftAI",0);
-				if(pos.RepWuSong()) MessageBox(0,"违例：长捉","AnimalcraftAI",0);
-				pos.UndoMakeMove();
-			}
-			else {
-				if(pos.Captured()) pos.SetIrrev2();
-				PlayResWav(IDR_ELEPHANT+PIECE_NAME(pos.mvsList[pos.nMoveNum-1].wpc));
-				if(training==0) ResponseMove();
-			}
+  }
+else if(pos.RepStatus())
+{
+/*if(pos.RepWuLai()) MessageBox(0,"\xce\xa5\xc0\xfd\xa3\xba\xce\xde\xc0\xb5\xd1\xad\xbb\xb7","AnimalcraftAI",0);*/
+if(pos.RepWuSong()) MessageBox(0,"\xce\xa5\xc0\xfd\xa3\xba\xb3\xa4\xd7\xbd","AnimalcraftAI",0);
+pos.UndoMakeMove();
+}
+else {
+if(pos.Captured()) pos.SetIrrev2();
+PlayResWav(IDR_ELEPHANT+PIECE_NAME(pos.mvsList[pos.nMoveNum-1].wpc));
+if(training==0) {
+    if (g_bPondering) {
+        g_bWaitingForClickResult = true;
+        g_bPonderHitSent = false;
+        pipeStdHandle.LineOutput("stop");
+        SetCursor((HCURSOR) LoadImage(NULL, IDC_WAIT, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
+    } else {
+        g_bWaitingForClickResult = true;
+        StartComputerMove();
+    }
+}
+}
       }
     }
   }
+  UpdateTitle();
   DeleteDC(Xqwl.hdcTmp);
   ReleaseDC(Xqwl.hWnd, Xqwl.hdc);
 }
-char FEN[100];
+char FEN[256];
 
-static BOOL CALLBACK DialogProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-  char input[1024];
-
-  switch (uMsg) {
-  // 退出
-  case WM_DESTROY:
-    PostQuitMessage(0);
-    break;
-  case WM_CLOSE:
-  	pipeStdHandle.LineOutput("stop");
-	while(1)
-	{
-		if(pipeStdHandle.LineInput(input))
-		{
-			if(strncmp(input,"bestmove",8)==0) break;
-		}
-		else Idle();
-	}
-  	DestroyWindow(hWnd);
-	break;
-  case WM_INITDIALOG:
-	map_to_fen2((pos.nMoveNum-1>=40)?40:(pos.nMoveNum-1));
-	sprintf(input,"fen %s",Search.fen);
-	pipeStdHandle.LineOutput(input);
-	Sleep(5);
-	pipeStdHandle.LineOutput("go infinite");
-  	break;
-  // 其他事件
-  default:
-  	if(pipeStdHandle.LineInput(input))
-  	{
-  		int depth=0,score=0;
-  		char pv[200]="";
-  		if(strncmp(input,"info",4)==0)
-  		{
-	  		for(int i=0;input[i]!='\0';i++)
-	  		{
-	  			if(strncmp(input+i,"depth",5)==0)
-	  			{
-	  				char *point=input+i+6;
-	  				depth=ReadDigit(point,99);
-				}
-	  			else if(strncmp(input+i,"score",5)==0)
-	  			{
-	  				if(input[i+6]=='-')
-	  				{
-	  					char *point=input+i+7;
-	  					score=-ReadDigit(point,99999);
-					}
-					else
-					{
-	  					char *point=input+i+6;
-	  					score=ReadDigit(point,99999);
-					}
-				}
-	  			else if(strncmp(input+i,"pv",2)==0)
-	  			{
-	  				int pvlen=0,j;
-	  				for(j=i+2;input[j]!='\0';j+=5)
-	  				{
-	  					char thismv[20];
-	  					pvlen++;
-						int mv=MOVE(COORD_XY(input[j+1]-'a'+3,input[j+2]-'0'+3),COORD_XY(input[j+3]-'a'+3,input[j+4]-'0'+3));
-	  					pos.MakeMove(mv);
-	  					strcpy(thismv,name[pos.ucpcSquares[DST(mv)]]);
-	  					switch(DST(mv)-SRC(mv))
-	  					{
-	  						case 1:
-	  						case 4:
-	  							strcat(thismv,"→ ");
-	  							break;
-	  						case -1:
-	  						case -4:
-	  							strcat(thismv,"← ");
-	  							break;
-	  						case -48:
-	  						case -16:
-	  							strcat(thismv,"↑ ");
-	  							break;
-	  						case 48:
-	  						case 16:
-	  							strcat(thismv,"↓ ");
-	  							break;
-						}
-	  					strcat(pv,thismv);
-					}
-	  				for(j=0;j<pvlen;j++)
-	  				{
-	  					pos.UndoMakeMove();
-					}
-				}
-			}
-		}
-		char output[1024];
-		if(depth!=0&&strlen(pv)!=0)
-		{
-			sprintf(output,"%d (%d) %s",depth,score,pv);
-			HWND hwnd=GetDlgItem(hWnd,IDC_EDIT1);
-			SetWindowText(hwnd,output);
-		}
-	}
-	else Idle(); 
-    return DefWindowProc(hWnd, uMsg, wParam, lParam);
-  }
-  return FALSE;
-}
-
-// 窗体事件捕捉过程
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	char send[1024];
+char send[1024];
   int x, y;
   HDC hdc;
   RECT rect;
@@ -1246,9 +1339,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
   MSGBOXPARAMS mbp;
 
   switch (uMsg) {
-  // 新建窗口
   case WM_CREATE:
-    // 调整窗口位置和尺寸
     GetWindowRect(hWnd, &rect);
     x = rect.left;
     y = rect.top;
@@ -1257,206 +1348,302 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     AdjustWindowRect(&rect, WINDOW_STYLES, TRUE);
     MoveWindow(hWnd, x, y, rect.right - rect.left, rect.bottom - rect.top, TRUE);
     break;
-  // 退出
   case WM_DESTROY:
+    if (g_hPonderDlg) {
+      DestroyWindow(g_hPonderDlg);
+      g_hPonderDlg = NULL;
+    }
     PostQuitMessage(0);
     break;
-  // 菜单命令
+  case WM_APP+2:
+    UpdateTitle();
+    break;
+  case WM_APP+4: {
+    g_bWaitingForClickResult = false;
+    if ((LONG)wParam != g_ponderGeneration) {
+        break;
+    }
+    CleanupPonderHandle();
+    SetCursor((HCURSOR) LoadImage(NULL, IDC_ARROW, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
+    if (!g_bPonderSuppressResult) {
+        Xqwl.hdc = GetDC(Xqwl.hWnd);
+        Xqwl.hdcTmp = CreateCompatibleDC(Xqwl.hdc);
+        ApplyEngineMove(g_pendingApplyMove);
+        DeleteDC(Xqwl.hdcTmp);
+        ReleaseDC(Xqwl.hWnd, Xqwl.hdc);
+        StartPondering();
+    }
+    g_bPonderSuppressResult = false;
+    break;
+  }
+  case WM_APP+5: {
+    g_bWaitingForClickResult = false;
+    if ((LONG)wParam != g_ponderGeneration) {
+        break;
+    }
+    CleanupPonderHandle();
+    SetCursor((HCURSOR) LoadImage(NULL, IDC_ARROW, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
+    if (!g_bPonderSuppressResult && training == 0 && !Xqwl.bGameOver) {
+        g_bWaitingForClickResult = true;
+        StartComputerMove();
+    }
+    g_bPonderSuppressResult = false;
+    break;
+  }
+  case WM_ENGINE_MOVE_READY: {
+    if ((LONG)wParam != g_computeParam.generation) {
+        break;
+    }
+    CleanupComputeHandle();
+    SetCursor((HCURSOR) LoadImage(NULL, IDC_ARROW, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
+    g_bWaitingForClickResult = false;
+    Xqwl.hdc = GetDC(Xqwl.hWnd);
+    Xqwl.hdcTmp = CreateCompatibleDC(Xqwl.hdc);
+    ApplyEngineMove((int)lParam);
+    DeleteDC(Xqwl.hdcTmp);
+    ReleaseDC(Xqwl.hWnd, Xqwl.hdc);
+    StartPondering();
+    break;
+  }
+  case WM_ENGINE_MOVE_DONE: {
+    if ((LONG)wParam != g_computeParam.generation) {
+        break;
+    }
+    CleanupComputeHandle();
+    SetCursor((HCURSOR) LoadImage(NULL, IDC_ARROW, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
+    g_bWaitingForClickResult = false;
+    break;
+  }
   case WM_COMMAND:
+    if ((g_bWaitingForClickResult || g_bComputerThinking) && LOWORD(wParam) != 414) {
+      break;
+    }
+    if (LOWORD(wParam) != 414) {
+      StopPondering();
+    }
     switch (LOWORD(wParam)) {
     case IDM_FILE_RED:
-	  PlayResWav(IDR_START);
-	  training=0;
+  PlayResWav(IDR_START);
+  training=0;
+      ResetAnalysisState();
       Startup();
       fen_to_map(FEN);
-	  map_to_fen();
-      strcpy(send,"");
-	  sprintf(send,"fen %s",Search.fen);
+      map_to_fen();
+      sprintf(send,"fen %s",Search.fen);
       pipeStdHandle.LineOutput(send);
 
       hdc = GetDC(Xqwl.hWnd);
       DrawBoard(hdc);
       ReleaseDC(Xqwl.hWnd, hdc);
+      StartPondering();
       break;
     case IDM_FILE_BLACK:
-	  PlayResWav(IDR_START);
-	  training=0;
-      Startup();
-      fen_to_map(FEN);
-	  map_to_fen();
-      strcpy(send,"");
-	  sprintf(send,"fen %s",Search.fen);
-      pipeStdHandle.LineOutput(send);
-
-      ResponseMove();
-      hdc = GetDC(Xqwl.hWnd);
-      DrawBoard(hdc);
-      ReleaseDC(Xqwl.hWnd, hdc);
+      PlayResWav(IDR_START);
+      if (!Xqwl.bGameOver) {
+        StartComputerMove();
+      }
       break;
     case IDM_FILE_TRAINING:
-	  PlayResWav(IDR_START);
-	  training=1;
+  PlayResWav(IDR_START);
+  training=1;
+      ResetAnalysisState();
       Startup();
-      fen_to_map(FEN); 
+      fen_to_map(FEN);
       hdc = GetDC(Xqwl.hWnd);
       DrawBoard(hdc);
       ReleaseDC(Xqwl.hWnd, hdc);
       break;
     case IDM_UNDO:
-      pos.UndoMakeMove();
-	  pos.UndoMakeMove();
+      ResetAnalysisState();
+      if (pos.nMoveNum > 2 && !training) {
+        pos.UndoMakeMove();
+        pos.UndoMakeMove();
+      } else if (pos.nMoveNum > 1 && training) {
+        pos.UndoMakeMove();
+      }
+      Xqwl.sqSelected = 0;
+      Xqwl.bGameOver = FALSE;
       hdc = GetDC(Xqwl.hWnd);
       DrawBoard(hdc);
       ReleaseDC(Xqwl.hWnd, hdc);
+      StartPondering();
       break;
     case IDM_FILE_EXIT:
       DestroyWindow(Xqwl.hWnd);
       break;
     case IDM_STANDARD:
-	{
-		strcpy(FEN,"T1E3m1l/1C5d1/2W3p2/9/2P3w2/1D5c1/L1M3e1t r");
-      fen_to_map(FEN); 
-      hdc = GetDC(Xqwl.hWnd);
-      DrawBoard(hdc);
-      ReleaseDC(Xqwl.hWnd, hdc);
-		break;
-	}
-    case IDM_HANDICAP:
-	{
-		strcpy(FEN,"T1E3m1l/1C5d1/2W3p2/9/2P3w2/1D5c1/L1M3e2 r");
+{
+strcpy(FEN,"T1E3m1l/1C5d1/2W3p2/9/2P3w2/1D5c1/L1M3e1t r");
+      ResetAnalysisState();
       fen_to_map(FEN);
       hdc = GetDC(Xqwl.hWnd);
       DrawBoard(hdc);
       ReleaseDC(Xqwl.hWnd, hdc);
-		break;
-	}
+break;
+}
+    case IDM_HANDICAP:
+{
+strcpy(FEN,"T1E3m1l/1C5d1/2W3p2/9/2P3w2/1D5c1/L1M3e2 r");
+      ResetAnalysisState();
+      fen_to_map(FEN);
+      hdc = GetDC(Xqwl.hWnd);
+      DrawBoard(hdc);
+      ReleaseDC(Xqwl.hWnd, hdc);
+break;
+}
     case IDM_LOADFEN:
     {
-		if (!IsClipboardFormatAvailable(CF_TEXT))
-		{
-			break;
-		}
-		if (!OpenClipboard(NULL))
-		{
-			break;
-		}
-		HGLOBAL hMem = GetClipboardData(CF_TEXT);
-		if (hMem != NULL)
-		{
-			LPTSTR lpStr = (LPTSTR)GlobalLock(hMem);
-			if (lpStr != NULL)
-			{
-				strcpy(FEN,lpStr);
-				GlobalUnlock(hMem);
-  				Startup();
-				fen_to_map(FEN);
-				hdc = GetDC(Xqwl.hWnd);
-			    DrawBoard(hdc);
-			    ReleaseDC(Xqwl.hWnd, hdc);
-			}
-		}
-		CloseClipboard();
-		break;
-	}
-	case IDM_OUTPUTFEN:
-	{
-		map_to_fen();
-		if(OpenClipboard(NULL))//打开剪贴板
-		{
-			HANDLE hClip;
-			char* pBuf;
-			EmptyClipboard();//清空剪贴板
-	
-			//写入数据
-			hClip=GlobalAlloc(GMEM_MOVEABLE,strlen(Search.fen)+1);
-			pBuf=(char*)GlobalLock(hClip);
-			strcpy(pBuf,Search.fen);
-			GlobalUnlock(hClip);//解锁
-			SetClipboardData(CF_TEXT,hClip);//设置格式
-	
-			//关闭剪贴板
-			CloseClipboard();
-		}
-		break;
-	} 
-	case IDD_ANALYZE_DIALOG:
-	{
-		MSG msg;
-	  // 打开窗口
-	  HWND hwnd = CreateDialogParam(Xqwl.hInst,MAKEINTRESOURCE(IDD_ANALYZE_DIALOG),Xqwl.hWnd,DialogProc,NULL);
-	  if (hwnd == NULL) {
-	  	break; 
-	  }
-		ShowWindow(hwnd,5);
-		UpdateWindow(hwnd);
-	  // 接收消息
-	  while (GetMessage(&msg, NULL, 0, 0)) {
-	    TranslateMessage(&msg);
-	    DispatchMessage(&msg);
-	  }
-		break;
-	}
+if (!IsClipboardFormatAvailable(CF_TEXT))
+{
+break;
+}
+if (!OpenClipboard(NULL))
+{
+break;
+}
+HGLOBAL hMem = GetClipboardData(CF_TEXT);
+if (hMem != NULL)
+{
+LPTSTR lpStr = (LPTSTR)GlobalLock(hMem);
+if (lpStr != NULL)
+{
+strcpy(FEN,lpStr);
+GlobalUnlock(hMem);
+  ResetAnalysisState();
+  Startup();
+fen_to_map(FEN);
+hdc = GetDC(Xqwl.hWnd);
+    DrawBoard(hdc);
+    ReleaseDC(Xqwl.hWnd, hdc);
+}
+}
+CloseClipboard();
+break;
+}
+case IDM_OUTPUTFEN:
+{
+map_to_fen();
+if(OpenClipboard(NULL))
+{
+HANDLE hClip;
+char* pBuf;
+EmptyClipboard();
+
+hClip=GlobalAlloc(GMEM_MOVEABLE,strlen(Search.fen)+1);
+pBuf=(char*)GlobalLock(hClip);
+strcpy(pBuf,Search.fen);
+GlobalUnlock(hClip);
+SetClipboardData(CF_TEXT,hClip);
+
+CloseClipboard();
+}
+break;
+}
+case 412:
+{
+    g_bBoardFlipped = !g_bBoardFlipped;
+    hdc = GetDC(Xqwl.hWnd);
+    DrawBoard(hdc);
+    ReleaseDC(Xqwl.hWnd, hdc);
+    break;
+}
+case 413:
+{
+    g_bPonderEnabled = !g_bPonderEnabled;
+    HMENU hMenu = GetMenu(Xqwl.hWnd);
+    CheckMenuItem(hMenu, 413, MF_BYCOMMAND | (g_bPonderEnabled ? MF_CHECKED : MF_UNCHECKED));
+    if (g_bPonderEnabled) {
+        StartPondering();
+    } else {
+        StopPondering();
+    }
+    break;
+}
+case 411:
+{
+    if (MessageBox(Xqwl.hWnd, "\xd6\xb4\xd0\xd0\xa1\xb8\xd0\xe9\xd2\xbb\xca\xd6\xa1\xb9\xbd\xab\xbb\xe1\xc7\xe5\xbf\xd5\xd6\xae\xc7\xb0\xb5\xc4\xbb\xda\xc6\xe5\xbc\xcd\xc2\xbc\xa3\xac\xc8\xb7\xb6\xa8\xd2\xaa\xbc\xcc\xd0\xf8\xc2\xf0\xa3\xbf", "\xd0\xe9\xd2\xbb\xca\xd6\xc8\xb7\xc8\xcf", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+        ResetAnalysisState();
+        pos.ChangeSide();
+        pos.SetIrrev();
+        pos.SetIrrev2();
+
+        Xqwl.sqSelected = 0;
+
+        if (training == 0 && !Xqwl.bGameOver) {
+            StartComputerMove();
+        } else {
+            hdc = GetDC(Xqwl.hWnd);
+            DrawBoard(hdc);
+            ReleaseDC(Xqwl.hWnd, hdc);
+        }
+    }
+    break;
+}
+case 414:
+{
+    if (g_hPonderDlg == NULL) {
+        g_hPonderDlg = CreateDialog(Xqwl.hInst, MAKEINTRESOURCE(IDD_PONDER_DIALOG), Xqwl.hWnd, PonderDialogProc);
+        if (g_hPonderDlg) {
+            ShowWindow(g_hPonderDlg, SW_SHOW);
+            PostMessage(g_hPonderDlg, WM_APP+3, 0, 0);
+        }
+    } else {
+        SetForegroundWindow(g_hPonderDlg);
+    }
+    break;
+}
     break;
     }
     break;
-  // 绘图
   case WM_PAINT:
     hdc = BeginPaint(Xqwl.hWnd, &ps);
     DrawBoard(hdc);
     EndPaint(Xqwl.hWnd, &ps);
     break;
-  // 鼠标点击
   case WM_LBUTTONDOWN:
-    x = FILE_LEFT + (LOWORD(lParam) - BOARD_EDGE) / SQUARE_SIZE;
-    y = RANK_TOP + (HIWORD(lParam) - BOARD_EDGE) / SQUARE_SIZE;
+    if (g_bBoardFlipped) {
+      x = FILE_RIGHT - (LOWORD(lParam) - BOARD_EDGE) / SQUARE_SIZE;
+      y = RANK_BOTTOM - (HIWORD(lParam) - BOARD_EDGE) / SQUARE_SIZE;
+    } else {
+      x = FILE_LEFT + (LOWORD(lParam) - BOARD_EDGE) / SQUARE_SIZE;
+      y = RANK_TOP + (HIWORD(lParam) - BOARD_EDGE) / SQUARE_SIZE;
+    }
     if (x >= FILE_LEFT && x <= FILE_RIGHT && y >= RANK_TOP && y <= RANK_BOTTOM) {
       ClickSquare(COORD_XY(x, y));
     }
     break;
-  // 其他事件
   default:
     return DefWindowProc(hWnd, uMsg, wParam, lParam);
   }
   return FALSE;
 }
 
-// 装入资源图片
 inline HBITMAP LoadResBmp(int nResId) {
   return (HBITMAP) LoadImage(Xqwl.hInst, MAKEINTRESOURCE(nResId), IMAGE_BITMAP,0,0, LR_DEFAULTSIZE | LR_SHARED);
 }
 
-// 入口过程
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	
-	pipeStdHandle.Open("engine.exe");
-	pipeStdHandle.LineOutput("uaci");
-	int tt=clock();
-	char input[1024];
-	while (strcmp(input,"uaciok")!=0) {
-		if(clock()-tt>=1000)
-		{
-			MessageBox(0,"引擎文件加载失败","AnimalcraftAI",0);
-			pipeStdHandle.LineOutput("quit");
-			pipeStdHandle.Close();
-			return 0; 
-		}
-		pipeStdHandle.LineInput(input);
-	}
-	
-	PlayResWav(IDR_START);
-	
+
+pipeStdHandle.Open("engine.exe");
+if (!WaitEngineBootReady(5000)) {
+MessageBox(0,"\xd2\xfd\xc7\xe6\xce\xc4\xbc\xfe\xbc\xd7\xd4\xd8\xca\xa7\xb0\xdc","AnimalcraftAI",0);
+pipeStdHandle.LineOutput("quit");
+pipeStdHandle.Close();
+return 0;
+}
+
+PlayResWav(IDR_START);
+
   int i;
   MSG msg;
   WNDCLASSEX wce;
 
-  // 初始化全局变量
   srand((DWORD) time(NULL));
   InitZobrist();
   Xqwl.hInst = hInstance;
   strcpy(FEN,"T1E3m1l/1C5d1/2W3p2/9/2P3w2/1D5c1/L1M3e1t r");
   fen_to_map(FEN);
 
-  // 装入图片
   Xqwl.bmpBoard = LoadResBmp(IDB_BOARD);
   Xqwl.bmpSelected = LoadResBmp(IDB_SELECTED);
   for (i = PIECE_ELEPHANT; i <= PIECE_MOUSE; i ++) {
@@ -1466,7 +1653,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     Xqwl.bmpTrap = LoadResBmp(IDB_TRAP);
     Xqwl.bmpDen = LoadResBmp(IDB_DEN);
 
-  // 设置窗口
   wce.cbSize = sizeof(WNDCLASSEX);
   wce.style = 0;
   wce.lpfnWndProc = (WNDPROC) WndProc;
@@ -1480,7 +1666,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   wce.hIconSm = (HICON) LoadImage(hInstance, MAKEINTRESOURCE(IDI_APPICON), IMAGE_ICON, 16, 16, LR_SHARED);
   RegisterClassEx(&wce);
 
-  // 打开窗口
   Xqwl.hWnd = CreateWindow("AnimalcraftAI", "AnimalcraftAI", WINDOW_STYLES,
       CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, hInstance, NULL);
   if (Xqwl.hWnd == NULL) {
@@ -1489,16 +1674,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   ShowWindow(Xqwl.hWnd, nCmdShow);
   UpdateWindow(Xqwl.hWnd);
 
-
-	
-
-  // 接收消息
   while (GetMessage(&msg, NULL, 0, 0)) {
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
 
-	pipeStdHandle.LineOutput("quit");
-	pipeStdHandle.Close();
+StopPondering();
+CleanupComputeHandle();
+pipeStdHandle.LineOutput("quit");
+pipeStdHandle.Close();
   return msg.wParam;
 }
